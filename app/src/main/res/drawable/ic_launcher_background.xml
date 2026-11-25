@@ -8,13 +8,18 @@
             <gradient android:type="linear"
                 android:startX="0" android:startY="0"
                 android:endX="108" android:endY="108">
-                <item android:offset="0" android:color="#FFFF9A3D" />
-                <item android:offset="0.55" android:color="#FFFF5E5B" />
-                <item android:offset="1" android:color="#FFD6336C" />
+                <item android:offset="0" android:color="#FF2D2350" />
+                <item android:offset="1" android:color="#FF120F1C" />
             </gradient>
         </aapt:attr>
     </path>
-    <!-- soft glow behind the pup -->
-    <path android:fillColor="#22FFFFFF"
-        android:pathData="M54,22a32,32 0 1,1 0,64a32,32 0 1,1 0,-64z" />
+    <path android:pathData="M54,14a40,40 0 1,1 0,80a40,40 0 1,1 0,-80z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial"
+                android:centerX="54" android:centerY="58" android:gradientRadius="40">
+                <item android:offset="0" android:color="#33FF7A3D" />
+                <item android:offset="1" android:color="#00FF7A3D" />
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>

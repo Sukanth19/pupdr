@@ -20,16 +20,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.suks.pupdr.R
-import dev.suks.pupdr.ui.theme.PupCoral
-import dev.suks.pupdr.ui.theme.PupOrange
-import dev.suks.pupdr.ui.theme.PupPink
 
-val PupGradient = Brush.linearGradient(listOf(PupOrange, PupCoral, PupPink))
+val PupGradient = Brush.linearGradient(listOf(Color(0xFF2D2350), Color(0xFF120F1C)))
 
 @Composable
 fun PupLogo(size: Dp = 36.dp, modifier: Modifier = Modifier) {

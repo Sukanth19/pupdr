@@ -1,8 +1,8 @@
-<p align="center"><img src="docs/icon.png" width="360" alt="pupdr icon"></p>
+<p align="center"><img src="docs/icon.png" width="360" alt="pupdr icon: pull-up bar over up/down arrows"></p>
 
 # pupdr
 
-A Kotlin / Jetpack Compose Android app for tracking daily gym workouts.
+A Kotlin / Jetpack Compose Android app for tracking daily gym workouts. The name comes from the STM32 GPIO pull-up/pull-down register (PUPDR); the icon is a pull-up bar over ⇅ arrows.
 
 ## Features
 
