@@ -1,10 +1,14 @@
 package dev.suks.pupdr.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -12,21 +16,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.Circle
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,16 +45,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import dev.suks.pupdr.data.Exercise
 import dev.suks.pupdr.ui.ExercisesViewModel
+import dev.suks.pupdr.ui.theme.Motion
 
-/** Full-screen multi-select exercise picker. */
+/** Full-screen exercise picker. Multi-select by default; [single] returns on the first tap. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExercisePicker(
     vm: ExercisesViewModel,
     title: String,
     onDismiss: () -> Unit,
+    single: Boolean = false,
     onPicked: (List<String>) -> Unit,
 ) {
     val all by vm.all.collectAsState()
@@ -62,56 +66,69 @@ fun ExercisePicker(
     var creating by remember { mutableStateOf(false) }
     val list = remember(all, query, muscle) { ExercisesViewModel.filter(all, query, muscle, null) }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text(title) },
                     navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
-                    actions = { TextButton(onClick = { creating = true }) { Text("Custom") } },
+                    actions = { TextButton(onClick = { creating = true }) { Text("New") } },
                 )
             },
-            bottomBar = {
-                Row(Modifier.fillMaxWidth().padding(16.dp).imePadding()) {
-                    Button(
+            floatingActionButton = {
+                AnimatedVisibility(
+                    visible = selected.isNotEmpty(),
+                    enter = slideInVertically(Motion.enter()) { it * 2 } + fadeIn(Motion.enter()),
+                    exit = slideOutVertically(Motion.exit()) { it * 2 } + fadeOut(Motion.exit()),
+                ) {
+                    ExtendedFloatingActionButton(
                         onClick = { onPicked(selected.toList()) },
-                        enabled = selected.isNotEmpty(),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        contentPadding = PaddingValues(16.dp),
-                    ) { Text(if (selected.isEmpty()) "Select exercises" else "Add ${selected.size} exercise${if (selected.size > 1) "s" else ""}") }
+                        icon = { Icon(Icons.Default.Check, null) },
+                        text = { Text("Add ${selected.size}") },
+                        modifier = Modifier.imePadding(),
+                    )
                 }
             },
         ) { pad ->
             Column(Modifier.padding(pad).fillMaxSize()) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    placeholder = { Text("Search ${all.size} exercises") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                )
-                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(muscles) { m ->
-                        FilterChip(selected = muscle == m, onClick = { muscle = if (muscle == m) null else m }, label = { Text(m.titleCase()) })
+                SearchField(query, { query = it }, "Search ${all.size} exercises", Modifier.padding(horizontal = 16.dp))
+                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(muscles, key = { it }) { m ->
+                        FilterChip(
+                            selected = muscle == m,
+                            onClick = { muscle = if (muscle == m) null else m },
+                            label = { Text(m.titleCase()) },
+                            leadingIcon = if (muscle == m) { { Icon(Icons.Default.Check, null, Modifier.padding(0.dp)) } } else null,
+                            colors = FilterChipDefaults.filterChipColors(),
+                        )
                     }
                 }
-                LazyColumn(Modifier.fillMaxSize()) {
-                    items(list, key = { it.id }) { ex ->
-                        val isSel = ex.id in selected
-                        ExerciseRow(ex, isSel) { if (isSel) selected.remove(ex.id) else selected.add(ex.id) }
-                    }
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
                     if (list.isEmpty() && query.isNotBlank()) {
-                        item {
+                        item(key = "create") {
                             ListItem(
-                                headlineContent = { Text("Create \"$query\"") },
-                                supportingContent = { Text("Add it as a custom exercise") },
+                                headlineContent = { Text("Create \"${query.trim()}\"") },
+                                supportingContent = { Text("Add it as your own exercise") },
                                 leadingContent = { Icon(Icons.Default.Add, null) },
-                                modifier = Modifier.clickable { creating = true },
+                                modifier = Modifier.clickable { creating = true }.animateItem(),
                             )
                         }
+                    }
+                    items(list, key = { it.id }) { ex ->
+                        val isSel = ex.id in selected
+                        ListItem(
+                            headlineContent = { Text(ex.name) },
+                            supportingContent = { Text(listOf(musclesLabel(ex.primaryMuscles), ex.equipment.titleCase()).filter { it.isNotBlank() }.joinToString(" · ")) },
+                            leadingContent = { ExerciseAvatar(ex.name) },
+                            trailingContent = if (single) null else { { Checkbox(checked = isSel, onCheckedChange = null) } },
+                            colors = ListItemDefaults.colors(
+                                containerColor = if (isSel) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+                            ),
+                            modifier = Modifier.animateItem().clickable {
+                                if (single) onPicked(listOf(ex.id))
+                                else if (isSel) selected.remove(ex.id) else selected.add(ex.id)
+                            },
+                        )
                     }
                 }
             }
@@ -120,20 +137,10 @@ fun ExercisePicker(
     if (creating) {
         CustomExerciseDialog(initialName = query, onDismiss = { creating = false }) { name, m, eq ->
             creating = false
-            vm.createCustom(name, m, eq) { selected.add(it.id); query = "" }
+            vm.createCustom(name, m, eq) {
+                if (single) onPicked(listOf(it.id)) else { selected.add(it.id); query = "" }
+            }
         }
     }
 }
 
-@Composable
-private fun ExerciseRow(ex: Exercise, selected: Boolean, onClick: () -> Unit) {
-    ListItem(
-        headlineContent = { Text(ex.name) },
-        supportingContent = { Text(listOf(musclesLabel(ex.primaryMuscles), ex.equipment.titleCase()).filter { it.isNotBlank() }.joinToString(" · ")) },
-        trailingContent = {
-            if (selected) Icon(Icons.Default.CheckCircle, "Selected", tint = MaterialTheme.colorScheme.primary)
-            else Icon(Icons.Outlined.Circle, null, tint = MaterialTheme.colorScheme.outline)
-        },
-        modifier = Modifier.clickable(onClick = onClick),
-    )
-}

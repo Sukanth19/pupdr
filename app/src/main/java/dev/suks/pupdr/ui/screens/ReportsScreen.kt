@@ -2,45 +2,65 @@ package dev.suks.pupdr.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.TableChart
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDateRangePickerState
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,29 +72,38 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.suks.pupdr.domain.DateRange
-import dev.suks.pupdr.domain.RangePreset
+import dev.suks.pupdr.domain.Granularity
 import dev.suks.pupdr.domain.Report
 import dev.suks.pupdr.domain.ReportBuilder
 import dev.suks.pupdr.ui.Exporter
 import dev.suks.pupdr.ui.ReportsViewModel
-import dev.suks.pupdr.ui.components.StatTile
+import dev.suks.pupdr.ui.components.AnimatedNumber
+import dev.suks.pupdr.ui.components.EmptyState
 import dev.suks.pupdr.ui.components.titleCase
+import dev.suks.pupdr.ui.theme.Motion
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(vm: ReportsViewModel) {
-    val preset by vm.preset.collectAsState()
+    val granularity by vm.granularity.collectAsState()
+    val offset by vm.offset.collectAsState()
+    val custom by vm.custom.collectAsState()
     val range by vm.range.collectAsState()
+    val title by vm.title.collectAsState()
     val report by vm.report.collectAsState()
     val unit by vm.unit.collectAsState()
     val context = LocalContext.current
     var pickingRange by remember { mutableStateOf(false) }
+    var exporting by remember { mutableStateOf(false) }
+    val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     val baseName = "pupdr-report-${range.from}_${range.to}"
 
     val saveCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
@@ -87,88 +116,90 @@ fun ReportsScreen(vm: ReportsViewModel) {
     }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0),
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text("Reports") },
-                actions = { TextButton(onClick = vm::toggleUnit) { Text(unit.uppercase()) } },
+                actions = {
+                    IconButton(onClick = { pickingRange = true }) { Icon(Icons.Default.DateRange, "Custom range") }
+                    IconButton(onClick = { exporting = true }, enabled = report != null) { Icon(Icons.Default.IosShare, "Export") }
+                },
+                scrollBehavior = scroll,
             )
         },
     ) { pad ->
         LazyColumn(
             Modifier.padding(pad).fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    RangePreset.entries.forEach { p ->
-                        FilterChip(
-                            selected = preset == p,
-                            onClick = { if (p == RangePreset.CUSTOM) pickingRange = true else vm.select(p) },
-                            label = { Text(p.label) },
-                        )
+            item(key = "segments") {
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    Granularity.entries.forEachIndexed { i, g ->
+                        SegmentedButton(
+                            selected = custom == null && granularity == g,
+                            onClick = { vm.select(g) },
+                            shape = SegmentedButtonDefaults.itemShape(i, Granularity.entries.size),
+                            icon = {},
+                        ) { Text(g.label, maxLines = 1) }
                     }
                 }
             }
-            item { Text(range.label(), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary) }
+            item(key = "period") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val canNavigate = custom == null && granularity != Granularity.ALL
+                    IconButton(onClick = { vm.shift(-1) }, enabled = canNavigate) { Icon(Icons.Default.ChevronLeft, "Previous") }
+                    AnimatedContent(
+                        targetState = Triple(title, range, offset),
+                        transitionSpec = {
+                            val forward = targetState.third > initialState.third
+                            (slideInHorizontally(Motion.enter()) { if (forward) it / 3 else -it / 3 } + fadeIn(Motion.enter()))
+                                .togetherWith(slideOutHorizontally(Motion.exit()) { if (forward) -it / 3 else it / 3 } + fadeOut(Motion.exit()))
+                        },
+                        modifier = Modifier.weight(1f),
+                        label = "period",
+                    ) { (t, r, _) ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                            Text(t, style = MaterialTheme.typography.titleLarge)
+                            Text(r.label(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    IconButton(onClick = { vm.shift(1) }, enabled = canNavigate && offset < 0) { Icon(Icons.Default.ChevronRight, "Next") }
+                }
+            }
             val r = report
             if (r != null) {
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            StatTile("days trained", "${r.daysTrained}/${r.range.days}", Modifier.weight(1f), highlight = true)
-                            StatTile("sets", "${r.totalSets}", Modifier.weight(1f))
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            StatTile("reps", "${r.totalReps}", Modifier.weight(1f))
-                            StatTile("volume $unit", ReportBuilder.fmt(r.totalVolume), Modifier.weight(1f))
-                        }
-                    }
-                }
-                item {
-                    Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("Export this report", style = MaterialTheme.typography.titleMedium)
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Button(onClick = { Exporter.share(context, "$baseName.csv", "text/csv", ReportBuilder.toCsv(r)) }, modifier = Modifier.weight(1f)) {
-                                    Icon(Icons.Default.TableChart, null); Spacer(Modifier.width(6.dp)); Text("Share CSV")
-                                }
-                                FilledTonalButton(onClick = { Exporter.share(context, "$baseName.txt", "text/plain", ReportBuilder.toText(r)) }, modifier = Modifier.weight(1f)) {
-                                    Icon(Icons.Default.Description, null); Spacer(Modifier.width(6.dp)); Text("Share text")
-                                }
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                OutlinedButton(onClick = { saveCsv.launch("$baseName.csv") }, modifier = Modifier.weight(1f)) {
-                                    Icon(Icons.Default.Save, null); Spacer(Modifier.width(6.dp)); Text("Save CSV")
-                                }
-                                OutlinedButton(onClick = { saveTxt.launch("$baseName.txt") }, modifier = Modifier.weight(1f)) {
-                                    Icon(Icons.Default.Save, null); Spacer(Modifier.width(6.dp)); Text("Save text")
-                                }
-                            }
-                        }
-                    }
-                }
-                if (r.byDay.isNotEmpty()) item { VolumeChart(r) }
-                if (r.byMuscle.isNotEmpty()) item { MuscleBars(r) }
-                if (r.byExercise.isNotEmpty()) {
-                    item { Text("Exercises", style = MaterialTheme.typography.titleMedium) }
-                    items(r.byExercise) { e ->
-                        Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-                            Column(Modifier.fillMaxWidth().padding(14.dp)) {
-                                Text(e.name, style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    "${e.sets} sets · ${e.reps} reps · ${ReportBuilder.fmt(e.volume)} $unit\nbest ${ReportBuilder.fmt(e.bestWeight)} $unit · est. 1RM ${ReportBuilder.fmt(e.bestE1rm)} $unit",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+                item(key = "stats") { StatsGrid(r, unit) }
+                if (r.totalSets == 0) {
+                    item(key = "empty") {
+                        EmptyState(Icons.Default.Insights, "No workouts in this period", "Log a few sets and your stats will show up here.", Modifier.animateItem())
                     }
                 } else {
-                    item {
-                        Text("No sets logged in this period yet. Log a workout and it'll show up here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    item(key = "chart") { ActivityChart(r) }
+                    if (r.byMuscle.isNotEmpty()) item(key = "muscles") { MuscleBars(r) }
+                    item(key = "exercises") { ExerciseTable(r, unit) }
                 }
+            }
+        }
+    }
+
+    if (exporting && report != null) {
+        ModalBottomSheet(onDismissRequest = { exporting = false }) {
+            Column(Modifier.padding(bottom = 24.dp)) {
+                Text("Export report", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp))
+                Text("$title · ${range.label()}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+                Spacer(Modifier.height(8.dp))
+                val r = report!!
+                ExportRow(Icons.Default.TableChart, "Share spreadsheet (CSV)", "Every set, ready for Excel or Sheets") {
+                    exporting = false; Exporter.share(context, "$baseName.csv", "text/csv", ReportBuilder.toCsv(r))
+                }
+                ExportRow(Icons.Default.Description, "Share summary (text)", "Totals, muscles, PRs and the full log") {
+                    exporting = false; Exporter.share(context, "$baseName.txt", "text/plain", ReportBuilder.toText(r))
+                }
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                ExportRow(Icons.Default.SaveAlt, "Save CSV to device", null) { exporting = false; saveCsv.launch("$baseName.csv") }
+                ExportRow(Icons.Default.SaveAlt, "Save text to device", null) { exporting = false; saveTxt.launch("$baseName.txt") }
             }
         }
     }
@@ -183,8 +214,7 @@ fun ReportsScreen(vm: ReportsViewModel) {
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val s = state.selectedStartDateMillis
-                        if (s != null) {
+                        state.selectedStartDateMillis?.let { s ->
                             val from = Instant.ofEpochMilli(s).atZone(ZoneOffset.UTC).toLocalDate()
                             val to = state.selectedEndDateMillis?.let { Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() } ?: from
                             vm.setCustom(DateRange(from, to))
@@ -200,37 +230,90 @@ fun ReportsScreen(vm: ReportsViewModel) {
 }
 
 @Composable
-private fun VolumeChart(r: Report) {
+private fun ExportRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String?, onClick: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(title) },
+        supportingContent = subtitle?.let { { Text(it) } },
+        leadingContent = { Icon(icon, null) },
+        modifier = Modifier.clickable(onClick = onClick),
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    )
+}
+
+@Composable
+private fun StatsGrid(r: Report, unit: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Stat("Days trained", "${r.daysTrained}", "of ${r.range.days}", Modifier.weight(1f), highlight = true)
+            Stat("Sets", "${r.totalSets}", null, Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Stat("Reps", "${r.totalReps}", null, Modifier.weight(1f))
+            Stat("Volume", ReportBuilder.fmt(r.totalVolume), unit, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun Stat(label: String, value: String, suffix: String?, modifier: Modifier, highlight: Boolean = false) {
+    val bg = if (highlight) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
+    val fg = if (highlight) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+    Card(modifier, shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = bg)) {
+        Column(Modifier.padding(20.dp)) {
+            Text(label, style = MaterialTheme.typography.labelLarge, color = fg.copy(alpha = 0.75f))
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                AnimatedNumber(value, MaterialTheme.typography.headlineMedium, color = fg)
+                if (suffix != null) Text(" $suffix", style = MaterialTheme.typography.bodyMedium, color = fg.copy(alpha = 0.75f), modifier = Modifier.padding(bottom = 4.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionCard(title: String, content: @Composable () -> Unit) {
+    Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(16.dp))
+            content()
+        }
+    }
+}
+
+@Composable
+private fun ActivityChart(r: Report) {
     val primary = MaterialTheme.colorScheme.primary
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
-    // show at most the last 31 days as bars so it stays readable
     val days = if (r.range.days <= 31) (0 until r.range.days).map { r.range.from.plusDays(it) } else r.byDay.takeLast(31).map { it.date }
     val byDate = r.byDay.associateBy { it.date }
     val useSets = r.byDay.all { it.volume == 0.0 }
-    val maxVal = if (useSets) (r.byDay.maxOfOrNull { it.sets } ?: 1).toDouble() else r.byDay.maxOf { it.volume }.coerceAtLeast(1.0)
-    Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Column(Modifier.padding(16.dp)) {
-            Text(if (useSets) "Sets per day" else "Volume per day (${r.unit})", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(12.dp))
-            Canvas(Modifier.fillMaxWidth().height(120.dp)) {
-                val n = days.size.coerceAtLeast(1)
-                val gap = 4.dp.toPx()
-                val w = ((size.width - gap * (n - 1)) / n).coerceAtLeast(2f)
-                days.forEachIndexed { i, d ->
-                    val v = byDate[d]?.let { if (useSets) it.sets.toDouble() else it.volume } ?: 0.0
-                    val x = i * (w + gap)
-                    drawRoundRect(track, Offset(x, 0f), Size(w, size.height), CornerRadius(w / 2, w / 2))
-                    val h = (v / maxVal * size.height).toFloat()
-                    if (h > 0) drawRoundRect(primary, Offset(x, size.height - h), Size(w, h), CornerRadius(w / 2, w / 2))
-                }
+    val maxVal = (if (useSets) r.byDay.maxOfOrNull { it.sets.toDouble() } else r.byDay.maxOfOrNull { it.volume })?.coerceAtLeast(1.0) ?: 1.0
+    val grow = remember { Animatable(0f) }
+    LaunchedEffect(r.range, r.totalSets, r.totalVolume) {
+        grow.snapTo(0f)
+        grow.animateTo(1f, tween(Motion.LONG + 150, easing = Motion.EmphasizedDecelerate))
+    }
+    SectionCard(if (useSets) "Sets per day" else "Volume per day (${r.unit})") {
+        Canvas(Modifier.fillMaxWidth().height(140.dp)) {
+            val n = days.size.coerceAtLeast(1)
+            val gap = if (n > 14) 3.dp.toPx() else 6.dp.toPx()
+            val w = ((size.width - gap * (n - 1)) / n).coerceAtLeast(2f)
+            val radius = CornerRadius(minOf(w / 2, 8.dp.toPx()))
+            days.forEachIndexed { i, d ->
+                val v = byDate[d]?.let { if (useSets) it.sets.toDouble() else it.volume } ?: 0.0
+                val x = i * (w + gap)
+                drawRoundRect(track, Offset(x, 0f), Size(w, size.height), radius)
+                val h = (v / maxVal * size.height * grow.value).toFloat()
+                if (h > 0) drawRoundRect(primary, Offset(x, size.height - h), Size(w, h), radius)
             }
-            Spacer(Modifier.height(6.dp))
-            val fmt = DateTimeFormatter.ofPattern("d MMM")
-            Row(Modifier.fillMaxWidth()) {
-                Text(days.first().format(fmt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.weight(1f))
-                Text(days.last().format(fmt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+        }
+        Spacer(Modifier.height(8.dp))
+        val fmt = DateTimeFormatter.ofPattern("d MMM")
+        Row(Modifier.fillMaxWidth()) {
+            Text(days.first().format(fmt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.weight(1f))
+            Text(days.last().format(fmt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -239,16 +322,37 @@ private fun VolumeChart(r: Report) {
 private fun MuscleBars(r: Report) {
     val top = r.byMuscle.take(8)
     val max = top.first().second.toFloat()
-    Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Sets per muscle", style = MaterialTheme.typography.titleMedium)
+    SectionCard("Sets per muscle") {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             top.forEach { (m, c) ->
+                val frac by animateFloatAsState(c / max, Motion.standard(Motion.LONG), label = "muscle-$m")
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(m.titleCase(), Modifier.width(110.dp), style = MaterialTheme.typography.bodySmall)
-                    Box(Modifier.weight(1f).height(12.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
-                        Box(Modifier.fillMaxWidth(c / max).height(12.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.secondary))
+                    Text(m.titleCase(), Modifier.width(112.dp), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Box(Modifier.weight(1f).height(10.dp).clip(RoundedCornerShape(5.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+                        Box(Modifier.fillMaxWidth(frac).height(10.dp).clip(RoundedCornerShape(5.dp)).background(MaterialTheme.colorScheme.tertiary))
                     }
-                    Text("$c", Modifier.width(36.dp).padding(start = 8.dp), style = MaterialTheme.typography.labelMedium)
+                    Text("$c", Modifier.width(40.dp), style = MaterialTheme.typography.labelLarge, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExerciseTable(r: Report, unit: String) {
+    SectionCard("Exercises") {
+        r.byExercise.forEachIndexed { i, e ->
+            if (i > 0) HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(e.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text("${e.sets} sets · ${e.reps} reps", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (e.bestWeight > 0) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("${ReportBuilder.fmt(e.bestWeight)} $unit", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                        Text("e1RM ${ReportBuilder.fmt(e.bestE1rm)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }

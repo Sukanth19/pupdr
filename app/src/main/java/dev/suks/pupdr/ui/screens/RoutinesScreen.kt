@@ -10,21 +10,26 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileOpen
+import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -33,30 +38,41 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.suks.pupdr.data.RoutineSummary
+import dev.suks.pupdr.ui.ExercisesViewModel
 import dev.suks.pupdr.ui.Exporter
 import dev.suks.pupdr.ui.RoutinesViewModel
 import dev.suks.pupdr.ui.components.EmptyState
-import dev.suks.pupdr.ui.components.PasteImportDialog
+import dev.suks.pupdr.ui.components.ExerciseAvatar
+import dev.suks.pupdr.ui.components.ImportReview
+import dev.suks.pupdr.ui.components.PasteImportSheet
 import dev.suks.pupdr.ui.components.TextInputDialog
+import dev.suks.pupdr.ui.theme.Motion
 
 private fun fileSafe(s: String) = s.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').ifEmpty { "routine" }
 
@@ -65,74 +81,104 @@ private fun shareRoutines(context: Context, vm: RoutinesViewModel, ids: List<Lon
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RoutinesScreen(vm: RoutinesViewModel, onOpen: (Long) -> Unit, onStarted: () -> Unit) {
+fun RoutinesScreen(vm: RoutinesViewModel, exVm: ExercisesViewModel, onOpen: (Long) -> Unit, onStarted: () -> Unit) {
     val routines by vm.routines.collectAsState()
+    val draft by vm.draft.collectAsState()
+    val parsing by vm.parsing.collectAsState()
     val context = LocalContext.current
     var creating by remember { mutableStateOf(false) }
     var pasting by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf<RoutineSummary?>(null) }
+    val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val listState = rememberLazyListState()
+    val fabExpanded by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
 
     val openFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) vm.import(Exporter.readFrom(context, uri))
+        if (uri != null) vm.preview(runCatching { Exporter.readFrom(context, uri) }.getOrDefault(""))
     }
     val saveAll = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) vm.export(routines.map { it.id }) { Exporter.writeTo(context, uri, it) }
     }
+    fun importFile() = openFile.launch(arrayOf("application/json", "text/*", "application/octet-stream", "*/*"))
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0),
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text("Routines") },
                 actions = {
-                    IconButton(onClick = { openFile.launch(arrayOf("application/json", "text/*", "application/octet-stream")) }) { Icon(Icons.Default.FileDownload, "Import from file") }
-                    IconButton(onClick = { pasting = true }) { Icon(Icons.Default.ContentPaste, "Paste routine") }
-                    IconButton(onClick = { saveAll.launch("pupdr-routines.json") }, enabled = routines.isNotEmpty()) { Icon(Icons.Default.FileUpload, "Export all") }
+                    IconButton(onClick = { pasting = true }) { Icon(Icons.Default.ContentPaste, "Paste a routine") }
+                    IconButton(onClick = ::importFile) { Icon(Icons.Default.FileOpen, "Import a file") }
+                    Box {
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More") }
+                        DropdownMenu(menu, { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Export all routines") },
+                                leadingIcon = { Icon(Icons.Default.SaveAlt, null) },
+                                enabled = routines.isNotEmpty(),
+                                onClick = { menu = false; saveAll.launch("pupdr-routines.json") },
+                            )
+                        }
+                    }
                 },
+                scrollBehavior = scroll,
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = { creating = true }, icon = { Icon(Icons.Default.Add, null) }, text = { Text("New routine") },
-                containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
+            ExtendedFloatingActionButton(onClick = { creating = true }, expanded = fabExpanded, icon = { Icon(Icons.Default.Add, null) }, text = { Text("New routine") })
         },
     ) { pad ->
-        if (routines.isEmpty()) {
-            Box(Modifier.padding(pad).fillMaxSize(), contentAlignment = Alignment.Center) {
-                EmptyState("No routines yet", "Build your own split, or import one from a file or pasted text (e.g. \"Bench Press 4x8\").") {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        FilledTonalButton(onClick = { openFile.launch(arrayOf("application/json", "text/*", "application/octet-stream")) }) { Text("Import file") }
-                        OutlinedButton(onClick = { pasting = true }) { Text("Paste") }
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.padding(pad).fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 112.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (routines.isEmpty()) {
+                item(key = "empty") {
+                    EmptyState(
+                        Icons.AutoMirrored.Filled.List,
+                        "No routines yet",
+                        "Build one from scratch, or paste a plan from anywhere. Notes, tables and spreadsheets all work.",
+                        Modifier.animateItem(),
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            FilledTonalButton(onClick = { pasting = true }) { Text("Paste text") }
+                            OutlinedButton(onClick = ::importFile) { Text("Open file") }
+                        }
                     }
                 }
             }
-        } else {
-            LazyColumn(
-                Modifier.padding(pad).fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(routines, key = { it.id }) { r ->
-                    RoutineCard(
-                        r,
-                        onOpen = { onOpen(r.id) },
-                        onStart = { vm.startToday(r.id, r.name, onStarted) },
-                        onShare = { shareRoutines(context, vm, listOf(r.id), r.name) },
-                        onDelete = { confirmDelete = r },
-                    )
-                }
+            items(routines, key = { it.id }) { r ->
+                RoutineCard(
+                    r,
+                    modifier = Modifier.animateItem(fadeInSpec = Motion.enter(), placementSpec = Motion.offsetSpring, fadeOutSpec = Motion.exit()),
+                    onOpen = { onOpen(r.id) },
+                    onStart = { vm.startToday(r.id, r.name, onStarted) },
+                    onShare = { shareRoutines(context, vm, listOf(r.id), r.name) },
+                    onDelete = { confirmDelete = r },
+                )
             }
         }
     }
 
-    if (creating) TextInputDialog("New routine", "Name (e.g. Push Day)", confirm = "Create", onDismiss = { creating = false }) {
+    if (creating) TextInputDialog("New routine", "Name", confirm = "Create", onDismiss = { creating = false }) {
         creating = false
         vm.create(it, onOpen)
     }
-    if (pasting) PasteImportDialog(onDismiss = { pasting = false }) { pasting = false; vm.import(it) }
+    if (pasting) PasteImportSheet(parsing, onDismiss = { pasting = false }) { text -> vm.preview(text) }
+    LaunchedEffect(draft != null) { if (draft != null) pasting = false }
+    draft?.let { d ->
+        ImportReview(d, vm, exVm, onDismiss = { vm.draft.value = null })
+    }
     confirmDelete?.let { r ->
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
+            icon = { Icon(Icons.Default.Delete, null) },
             title = { Text("Delete ${r.name}?") },
-            text = { Text("Your logged workouts are kept.") },
+            text = { Text("The routine is removed. Workouts you've already logged are kept.") },
             confirmButton = { TextButton(onClick = { vm.delete(r.id); confirmDelete = null }) { Text("Delete") } },
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancel") } },
         )
@@ -140,32 +186,31 @@ fun RoutinesScreen(vm: RoutinesViewModel, onOpen: (Long) -> Unit, onStarted: () 
 }
 
 @Composable
-private fun RoutineCard(r: RoutineSummary, onOpen: () -> Unit, onStart: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit) {
+private fun RoutineCard(r: RoutineSummary, modifier: Modifier, onOpen: () -> Unit, onStart: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     Card(
-        onClick = onOpen,
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 6.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.clickable(onClick = onOpen).padding(start = 16.dp, end = 8.dp, top = 16.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            ExerciseAvatar(r.name, size = 48.dp)
+            Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(r.name, style = MaterialTheme.typography.titleMedium)
-                Text("${r.exerciseCount} exercises", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (r.notes.isNotBlank()) Text(r.notes, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                Text("${r.exerciseCount} exercise${if (r.exerciseCount != 1) "s" else ""}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            FilledTonalButton(onClick = onStart, enabled = r.exerciseCount > 0) {
-                Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Start")
-            }
+            FilledTonalIconButton(onClick = onStart, enabled = r.exerciseCount > 0) { Icon(Icons.Default.PlayArrow, "Start today") }
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More") }
                 DropdownMenu(menu, { menu = false }) {
-                    DropdownMenuItem(text = { Text("Edit") }, onClick = { menu = false; onOpen() })
-                    DropdownMenuItem(text = { Text("Share / export") }, onClick = { menu = false; onShare() })
-                    DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; onDelete() })
+                    DropdownMenuItem(text = { Text("Edit") }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { menu = false; onOpen() })
+                    DropdownMenuItem(text = { Text("Share") }, leadingIcon = { Icon(Icons.Default.IosShare, null) }, onClick = { menu = false; onShare() })
+                    HorizontalDivider()
+                    DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Default.Delete, null) }, onClick = { menu = false; onDelete() })
                 }
             }
         }
     }
 }
+

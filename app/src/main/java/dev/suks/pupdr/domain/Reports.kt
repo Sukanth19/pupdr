@@ -8,40 +8,45 @@ import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 import kotlin.math.roundToInt
 
-enum class RangePreset(val label: String) {
-    TODAY("Today"),
-    YESTERDAY("Yesterday"),
-    THIS_WEEK("This week"),
-    LAST_WEEK("Last week"),
-    LAST_7("Last 7 days"),
-    THIS_MONTH("This month"),
-    LAST_MONTH("Last month"),
-    LAST_30("Last 30 days"),
-    THIS_YEAR("This year"),
-    ALL("All time"),
-    CUSTOM("Custom"),
-}
+enum class Granularity(val label: String) { DAY("Day"), WEEK("Week"), MONTH("Month"), YEAR("Year"), ALL("All") }
 
 data class DateRange(val from: LocalDate, val to: LocalDate) {
     val days: Long get() = to.toEpochDay() - from.toEpochDay() + 1
-    fun label(): String = if (from == to) from.format(DAY_FMT) else "${from.format(DAY_FMT)} – ${to.format(DAY_FMT)}"
+    fun label(): String = when {
+        from == to -> from.format(DAY_FMT)
+        from.year == to.year && from.month == to.month -> "${from.dayOfMonth} – ${to.format(SHORT_FMT)}"
+        from.year == to.year -> "${from.format(DM_FMT)} – ${to.format(SHORT_FMT)}"
+        else -> "${from.format(SHORT_FMT)} – ${to.format(SHORT_FMT)}"
+    }
 
     companion object {
         val DAY_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM yyyy", Locale.getDefault())
+        private val SHORT_FMT = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault())
+        private val DM_FMT = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
+    }
+}
 
-        fun of(preset: RangePreset, today: LocalDate, firstDay: LocalDate? = null): DateRange = when (preset) {
-            RangePreset.TODAY -> DateRange(today, today)
-            RangePreset.YESTERDAY -> today.minusDays(1).let { DateRange(it, it) }
-            RangePreset.THIS_WEEK -> DateRange(today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)), today)
-            RangePreset.LAST_WEEK -> today.minusWeeks(1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                .let { DateRange(it, it.plusDays(6)) }
-            RangePreset.LAST_7 -> DateRange(today.minusDays(6), today)
-            RangePreset.THIS_MONTH -> DateRange(today.withDayOfMonth(1), today)
-            RangePreset.LAST_MONTH -> today.minusMonths(1).let { DateRange(it.withDayOfMonth(1), it.with(TemporalAdjusters.lastDayOfMonth())) }
-            RangePreset.LAST_30 -> DateRange(today.minusDays(29), today)
-            RangePreset.THIS_YEAR -> DateRange(today.withDayOfYear(1), today)
-            RangePreset.ALL, RangePreset.CUSTOM -> DateRange(minOf(firstDay ?: today, today), today)
+/** A reporting period: a granularity plus how many periods back from the current one. */
+object Periods {
+    fun range(g: Granularity, offset: Int, today: LocalDate, firstDay: LocalDate? = null): DateRange = when (g) {
+        Granularity.DAY -> today.plusDays(offset.toLong()).let { DateRange(it, it) }
+        Granularity.WEEK -> {
+            val start = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(offset.toLong())
+            DateRange(start, start.plusDays(6))
         }
+        Granularity.MONTH -> today.plusMonths(offset.toLong()).let { DateRange(it.withDayOfMonth(1), it.with(TemporalAdjusters.lastDayOfMonth())) }
+        Granularity.YEAR -> today.plusYears(offset.toLong()).let { DateRange(it.withDayOfYear(1), it.with(TemporalAdjusters.lastDayOfYear())) }
+        Granularity.ALL -> DateRange(minOf(firstDay ?: today, today), today)
+    }
+
+    fun title(g: Granularity, offset: Int, range: DateRange): String = when {
+        g == Granularity.ALL -> "All time"
+        offset == 0 -> when (g) { Granularity.DAY -> "Today"; Granularity.WEEK -> "This week"; Granularity.MONTH -> "This month"; else -> "This year" }
+        offset == -1 -> when (g) { Granularity.DAY -> "Yesterday"; Granularity.WEEK -> "Last week"; Granularity.MONTH -> "Last month"; else -> "Last year" }
+        g == Granularity.MONTH -> range.from.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
+        g == Granularity.YEAR -> range.from.year.toString()
+        g == Granularity.DAY -> range.from.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault()))
+        else -> "${-offset} weeks ago"
     }
 }
 

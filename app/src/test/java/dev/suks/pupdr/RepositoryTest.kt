@@ -33,7 +33,10 @@ class RepositoryTest {
         val all = repo.exercises.first()
         assertTrue("library should be big, was ${all.size}", all.size > 800)
 
-        val result = repo.importRoutines("# Push\nBench Press 4x8\nMy Weird Move 2x15")
+        val drafts = repo.draftImport("# Push\nBench Press 4x8\nMy Weird Move 2x15")
+        assertEquals("Barbell Bench Press - Medium Grip", drafts.single().items[0].exerciseName)
+        assertTrue(drafts.single().items[1].isNew)
+        val result = repo.commitImport(drafts)
         assertEquals(1, result.routines)
         assertEquals(listOf("My Weird Move"), result.created)
 

@@ -2,7 +2,8 @@ package dev.suks.pupdr
 
 import dev.suks.pupdr.data.SetWithExercise
 import dev.suks.pupdr.domain.DateRange
-import dev.suks.pupdr.domain.RangePreset
+import dev.suks.pupdr.domain.Granularity
+import dev.suks.pupdr.domain.Periods
 import dev.suks.pupdr.domain.ReportBuilder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -14,12 +15,14 @@ class ReportBuilderTest {
     private fun set(day: LocalDate, ex: String, idx: Int, reps: Int, w: Double, done: Boolean = true) =
         SetWithExercise(0, day.toEpochDay(), ex, idx, reps, w, done, 0, ex.replaceFirstChar { it.uppercase() }, if (ex == "bench") "chest" else "quadriceps", "strength")
 
-    @Test fun presets() {
-        assertEquals(DateRange(LocalDate.of(2026, 11, 23), d), DateRange.of(RangePreset.THIS_WEEK, d))
-        assertEquals(DateRange(LocalDate.of(2026, 11, 16), LocalDate.of(2026, 11, 22)), DateRange.of(RangePreset.LAST_WEEK, d))
-        assertEquals(DateRange(LocalDate.of(2026, 11, 1), d), DateRange.of(RangePreset.THIS_MONTH, d))
-        assertEquals(DateRange(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)), DateRange.of(RangePreset.LAST_MONTH, d))
-        assertEquals(7, DateRange.of(RangePreset.LAST_7, d).days)
+    @Test fun periods() {
+        assertEquals(DateRange(d, d), Periods.range(Granularity.DAY, 0, d))
+        assertEquals(DateRange(LocalDate.of(2026, 11, 23), LocalDate.of(2026, 11, 29)), Periods.range(Granularity.WEEK, 0, d))
+        assertEquals(DateRange(LocalDate.of(2026, 11, 16), LocalDate.of(2026, 11, 22)), Periods.range(Granularity.WEEK, -1, d))
+        assertEquals(DateRange(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)), Periods.range(Granularity.MONTH, -1, d))
+        assertEquals(DateRange(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31)), Periods.range(Granularity.YEAR, -1, d))
+        assertEquals("Last week", Periods.title(Granularity.WEEK, -1, Periods.range(Granularity.WEEK, -1, d)))
+        assertEquals("September 2026", Periods.title(Granularity.MONTH, -2, Periods.range(Granularity.MONTH, -2, d)))
     }
 
     @Test fun aggregates() {
@@ -31,7 +34,7 @@ class ReportBuilderTest {
             set(d.minusDays(1), "squat", 1, 5, 90.0),
             set(d.minusDays(40), "squat", 1, 5, 80.0), // outside range
         )
-        val r = ReportBuilder.build(DateRange.of(RangePreset.THIS_WEEK, d), sets)
+        val r = ReportBuilder.build(Periods.range(Granularity.WEEK, 0, d), sets)
         assertEquals(2, r.daysTrained)
         assertEquals(4, r.totalSets)
         assertEquals(28, r.totalReps)

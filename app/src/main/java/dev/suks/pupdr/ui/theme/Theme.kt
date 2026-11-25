@@ -1,79 +1,91 @@
 package dev.suks.pupdr.ui.theme
 
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 
-val PupOrange = Color(0xFFFF7A3D)
-val PupCoral = Color(0xFFFF5E5B)
-val PupPink = Color(0xFFD6336C)
-val PupInk = Color(0xFF1E1B2E)
-val PupCream = Color(0xFFFFF4E6)
-
-private val Dark = darkColorScheme(
-    primary = PupOrange,
-    onPrimary = PupInk,
-    primaryContainer = Color(0xFF5A2A12),
-    onPrimaryContainer = Color(0xFFFFDBCB),
-    secondary = Color(0xFFFF8FA3),
-    onSecondary = PupInk,
-    secondaryContainer = Color(0xFF5C1B33),
-    onSecondaryContainer = Color(0xFFFFD9E0),
-    tertiary = Color(0xFF8BD3C7),
-    background = Color(0xFF15131F),
-    onBackground = Color(0xFFEDE6F2),
-    surface = Color(0xFF15131F),
-    onSurface = Color(0xFFEDE6F2),
-    surfaceVariant = Color(0xFF2A2638),
-    onSurfaceVariant = Color(0xFFC9C1D6),
-    surfaceContainer = Color(0xFF1F1C2B),
-    surfaceContainerHigh = Color(0xFF29253A),
-    surfaceContainerHighest = Color(0xFF332E45),
-    surfaceContainerLow = Color(0xFF1A1825),
-    outline = Color(0xFF6E6680),
-    outlineVariant = Color(0xFF3B3650),
+// brand fallback (used below Android 12 or when dynamic colour is off): ember orange on deep violet
+private val Light = lightColorScheme(
+    primary = Color(0xFFA33F12),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFFFDBCE),
+    onPrimaryContainer = Color(0xFF380D00),
+    secondary = Color(0xFF77574B),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFFFDBCE),
+    onSecondaryContainer = Color(0xFF2C160D),
+    tertiary = Color(0xFF8E3A5B),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFFFD9E3),
+    onTertiaryContainer = Color(0xFF3A0719),
+    background = Color(0xFFFFF8F6),
+    onBackground = Color(0xFF231915),
+    surface = Color(0xFFFFF8F6),
+    onSurface = Color(0xFF231915),
+    surfaceVariant = Color(0xFFF5DED6),
+    onSurfaceVariant = Color(0xFF53433E),
+    outline = Color(0xFF85736D),
+    outlineVariant = Color(0xFFD8C2BA),
+    surfaceContainerLowest = Color.White,
+    surfaceContainerLow = Color(0xFFFFF1EC),
+    surfaceContainer = Color(0xFFFCEAE4),
+    surfaceContainerHigh = Color(0xFFF6E4DE),
+    surfaceContainerHighest = Color(0xFFF0DFD9),
 )
 
-private val Light = lightColorScheme(
-    primary = Color(0xFFD9541A),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFDBCB),
-    onPrimaryContainer = Color(0xFF3A1400),
-    secondary = PupPink,
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFFFD9E0),
-    onSecondaryContainer = Color(0xFF3F0019),
-    tertiary = Color(0xFF00796B),
-    background = Color(0xFFFFFBF8),
-    onBackground = PupInk,
-    surface = Color(0xFFFFFBF8),
-    onSurface = PupInk,
-    surfaceVariant = Color(0xFFF3E7E0),
-    onSurfaceVariant = Color(0xFF52443D),
-    surfaceContainer = Color(0xFFF8EEE8),
-    surfaceContainerHigh = Color(0xFFF2E6DF),
-    surfaceContainerHighest = Color(0xFFECDFD8),
-    surfaceContainerLow = Color(0xFFFCF4EF),
+private val Dark = darkColorScheme(
+    primary = Color(0xFFFFB59A),
+    onPrimary = Color(0xFF5B1B00),
+    primaryContainer = Color(0xFF7F2B00),
+    onPrimaryContainer = Color(0xFFFFDBCE),
+    secondary = Color(0xFFE7BDAF),
+    onSecondary = Color(0xFF442A20),
+    secondaryContainer = Color(0xFF5D4035),
+    onSecondaryContainer = Color(0xFFFFDBCE),
+    tertiary = Color(0xFFFFB0C9),
+    onTertiary = Color(0xFF55102E),
+    tertiaryContainer = Color(0xFF722644),
+    onTertiaryContainer = Color(0xFFFFD9E3),
+    background = Color(0xFF1A110E),
+    onBackground = Color(0xFFF1DFD9),
+    surface = Color(0xFF1A110E),
+    onSurface = Color(0xFFF1DFD9),
+    surfaceVariant = Color(0xFF53433E),
+    onSurfaceVariant = Color(0xFFD8C2BA),
+    outline = Color(0xFFA08D86),
+    outlineVariant = Color(0xFF53433E),
+    surfaceContainerLowest = Color(0xFF140C09),
+    surfaceContainerLow = Color(0xFF231915),
+    surfaceContainer = Color(0xFF271D19),
+    surfaceContainerHigh = Color(0xFF322823),
+    surfaceContainerHighest = Color(0xFF3D322E),
 )
 
 private val Type = Typography().let {
     it.copy(
-        headlineMedium = it.headlineMedium.copy(fontWeight = FontWeight.Black),
-        headlineSmall = it.headlineSmall.copy(fontWeight = FontWeight.Bold),
-        titleLarge = it.titleLarge.copy(fontWeight = FontWeight.Bold),
-        titleMedium = it.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-        labelLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, letterSpacing = 0.2.sp),
+        displaySmall = it.displaySmall.copy(fontWeight = FontWeight.SemiBold),
+        headlineLarge = it.headlineLarge.copy(fontWeight = FontWeight.SemiBold),
+        headlineMedium = it.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
+        titleLarge = it.titleLarge.copy(fontWeight = FontWeight.Medium),
     )
 }
 
 @Composable
-fun PupdrTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (dark) Dark else Light, typography = Type, content = content)
+fun PupdrTheme(dynamic: Boolean = true, dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+    val scheme = when {
+        dynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            if (dark) dynamicDarkColorScheme(LocalContext.current) else dynamicLightColorScheme(LocalContext.current)
+        dark -> Dark
+        else -> Light
+    }
+    MaterialTheme(colorScheme = scheme, typography = Type, content = content)
 }
