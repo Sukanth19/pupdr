@@ -109,6 +109,7 @@ import dev.suks.pupdr.ui.WorkoutViewModel
 import dev.suks.pupdr.ui.components.AnimatedNumber
 import dev.suks.pupdr.ui.components.EmptyState
 import dev.suks.pupdr.ui.components.ExerciseAvatar
+import dev.suks.pupdr.ui.components.ExerciseIcon
 import dev.suks.pupdr.ui.components.ExercisePicker
 import dev.suks.pupdr.ui.components.musclesLabel
 import dev.suks.pupdr.ui.theme.Motion
@@ -352,17 +353,17 @@ private fun DaySummary(groups: List<ExerciseGroup>, unit: String, streak: Int, m
         AnimatedVisibility(sets.isNotEmpty(), enter = expandVertically(Motion.enter()) + fadeIn(Motion.enter()), exit = shrinkVertically(Motion.exit()) + fadeOut(Motion.exit())) {
             Card(
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                 modifier = Modifier.padding(top = 4.dp),
             ) {
                 Column(Modifier.fillMaxWidth().padding(20.dp)) {
                     Row(verticalAlignment = Alignment.Bottom) {
-                        AnimatedNumber("$done", MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                        Text(" / ${sets.size} sets", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.padding(bottom = 6.dp))
+                        AnimatedNumber("$done", MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onSurface)
+                        Text(" / ${sets.size} sets", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(bottom = 6.dp))
                         Spacer(Modifier.weight(1f))
                         Column(horizontalAlignment = Alignment.End) {
-                            AnimatedNumber(ReportBuilder.fmt(volume), MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                            Text("$unit volume", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f))
+                            AnimatedNumber(ReportBuilder.fmt(volume), MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+                            Text("$unit volume", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                         }
                     }
                     Spacer(Modifier.height(14.dp))
@@ -370,7 +371,7 @@ private fun DaySummary(groups: List<ExerciseGroup>, unit: String, streak: Int, m
                         progress = { progress },
                         modifier = Modifier.fillMaxWidth().height(8.dp),
                         color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         strokeCap = androidx.compose.ui.graphics.StrokeCap.Round,
                         gapSize = 0.dp,
                         drawStopIndicator = {},
@@ -395,11 +396,11 @@ private fun ExerciseCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(Modifier.animateContentSize(Motion.sizeSpring).padding(vertical = 8.dp)) {
             Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                ExerciseAvatar(group.name)
+                ExerciseIcon(group.category, custom = group.exerciseId.startsWith("custom_"))
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(group.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)

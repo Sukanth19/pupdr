@@ -163,12 +163,20 @@ private fun PupdrRoot(app: PupdrApp) {
                 }
             }
             composable(Tab.Routines.route) {
-                RoutinesScreen(routinesVm, exercisesVm, onOpen = { nav.navigate("routine/$it") }, onStarted = ::startedToday)
+                RoutinesScreen(
+                    routinesVm,
+                    onOpen = { nav.navigate("routine/$it") },
+                    onCreated = { nav.navigate("routine/$it?new=true") },
+                    onStarted = ::startedToday,
+                )
             }
             composable(Tab.Reports.route) { ReportsScreen(reportsVm) }
             composable(
-                "routine/{id}",
-                arguments = listOf(navArgument("id") { type = NavType.LongType }),
+                "routine/{id}?new={new}",
+                arguments = listOf(
+                    navArgument("id") { type = NavType.LongType },
+                    navArgument("new") { type = NavType.BoolType; defaultValue = false },
+                ),
                 // detail: Material "shared axis X"
                 enterTransition = { slideInHorizontally(Motion.enter(Motion.LONG)) { it / 5 } + fadeIn(Motion.enter(Motion.MEDIUM)) },
                 exitTransition = { slideOutHorizontally(Motion.exit(Motion.MEDIUM)) { it / 5 } + fadeOut(Motion.exit()) },
@@ -176,7 +184,8 @@ private fun PupdrRoot(app: PupdrApp) {
             ) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
                 val vm: RoutineDetailViewModel = viewModel(key = "routine-$id") { RoutineDetailViewModel(app, id) }
-                RoutineDetailScreen(vm, exercisesVm, onBack = { nav.popBackStack() }) { rid, name ->
+                val isNew = entry.arguments?.getBoolean("new") ?: false
+                RoutineDetailScreen(vm, exercisesVm, isNew, onBack = { nav.popBackStack() }) { rid, name ->
                     routinesVm.startToday(rid, name) { startedToday() }
                 }
             }

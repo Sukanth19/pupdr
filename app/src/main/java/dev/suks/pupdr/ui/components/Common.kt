@@ -17,6 +17,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.outlined.Hardware
+import androidx.compose.material.icons.outlined.SelfImprovement
+import androidx.compose.material.icons.outlined.SportsGymnastics
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -41,7 +49,7 @@ import androidx.compose.ui.unit.dp
 import dev.suks.pupdr.R
 import dev.suks.pupdr.ui.theme.Motion
 
-private val LogoGradient = Brush.linearGradient(listOf(Color(0xFF2D2350), Color(0xFF120F1C)))
+private val LogoGradient = Brush.linearGradient(listOf(Color.Black, Color.Black))
 
 @Composable
 fun PupLogo(size: Dp = 36.dp, modifier: Modifier = Modifier) {
@@ -79,8 +87,8 @@ fun EmptyState(icon: ImageVector, title: String, body: String, modifier: Modifie
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box(Modifier.size(96.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
-            Icon(icon, null, Modifier.size(44.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+        Box(Modifier.size(96.dp).clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+            Icon(icon, null, Modifier.size(44.dp), tint = MaterialTheme.colorScheme.onSurface)
         }
         Spacer(Modifier.height(24.dp))
         Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
@@ -106,18 +114,38 @@ fun AnimatedNumber(value: String, style: TextStyle, modifier: Modifier = Modifie
     ) { Text(it, style = style, color = color) }
 }
 
-/** Round tonal avatar with the exercise's initials, used as a leading element in lists. */
+/** Round monochrome avatar with initials, used for routines. */
 @Composable
 fun ExerciseAvatar(name: String, modifier: Modifier = Modifier, size: Dp = 40.dp) {
     val initials = name.split(' ', '-').filter { it.firstOrNull()?.isLetter() == true }.take(2).joinToString("") { it.first().uppercase() }
-    val palette = listOf(
-        MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer,
-        MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer,
-        MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer,
-    )
-    val (bg, fg) = palette[(name.hashCode() and 0x7fffffff) % palette.size]
-    Box(modifier.size(size).clip(CircleShape).background(bg), contentAlignment = Alignment.Center) {
-        Text(initials, style = MaterialTheme.typography.labelLarge, color = fg)
+    Box(modifier.size(size).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+        Text(initials.ifEmpty { "•" }, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+fun categoryIcon(category: String): ImageVector = when (category.lowercase()) {
+    "stretching" -> Icons.Outlined.SelfImprovement
+    "cardio" -> Icons.AutoMirrored.Outlined.DirectionsRun
+    "plyometrics" -> Icons.Outlined.SportsGymnastics
+    "olympic weightlifting" -> Icons.Outlined.EmojiEvents
+    "strongman" -> Icons.Outlined.Hardware
+    "powerlifting" -> Icons.Outlined.FitnessCenter
+    else -> Icons.Outlined.FitnessCenter
+}
+
+/** Rounded-square icon tile showing the exercise's category. */
+@Composable
+fun ExerciseIcon(category: String, modifier: Modifier = Modifier, size: Dp = 44.dp, custom: Boolean = false) {
+    Box(
+        modifier.size(size).clip(RoundedCornerShape(size * 0.32f)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (custom) Icons.Outlined.Edit else categoryIcon(category),
+            contentDescription = null,
+            modifier = Modifier.size(size * 0.5f),
+            tint = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

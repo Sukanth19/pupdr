@@ -119,10 +119,10 @@ fun ExercisePicker(
                         ListItem(
                             headlineContent = { Text(ex.name) },
                             supportingContent = { Text(listOf(musclesLabel(ex.primaryMuscles), ex.equipment.titleCase()).filter { it.isNotBlank() }.joinToString(" · ")) },
-                            leadingContent = { ExerciseAvatar(ex.name) },
+                            leadingContent = { ExerciseIcon(ex.category, custom = ex.custom) },
                             trailingContent = if (single) null else { { Checkbox(checked = isSel, onCheckedChange = null) } },
                             colors = ListItemDefaults.colors(
-                                containerColor = if (isSel) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+                                containerColor = if (isSel) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surface,
                             ),
                             modifier = Modifier.animateItem().clickable {
                                 if (single) onPicked(listOf(ex.id))

@@ -28,35 +28,64 @@ class RepositoryTest {
 
     @After fun tearDown() = db.close()
 
-    @Test fun seedsLibraryAndImportsRoutine() = runTest {
+    @Test fun createRoutineFlow() = runTest {
         repo.ensureSeeded(ctx)
         val all = repo.exercises.first()
         assertTrue("library should be big, was ${all.size}", all.size > 800)
+        val bench = all.first { it.name == "Barbell Bench Press - Medium Grip" }
+        val squat = all.first { it.name == "Barbell Squat" }
 
-        val drafts = repo.draftImport("# Push\nBench Press 4x8\nMy Weird Move 2x15")
-        assertEquals("Barbell Bench Press - Medium Grip", drafts.single().items[0].exerciseName)
-        assertTrue(drafts.single().items[1].isNew)
-        val result = repo.commitImport(drafts)
-        assertEquals(1, result.routines)
-        assertEquals(listOf("My Weird Move"), result.created)
+        // new routine starts unnamed; picking exercises then naming it
+        val id = repo.createRoutine("")
+        repo.addToRoutine(id, listOf(bench.id, squat.id))
+        repo.renameRoutine(id, "Push", "")
+        repo.updateTarget(repo.routineItems(id).first().first().id, 4, "8")
+        repo.finishEditing(id, wasNew = true)
 
         val routine = repo.routines.first().single()
         assertEquals("Push", routine.name)
         assertEquals(2, routine.exerciseCount)
+        assertEquals(7, routine.totalSets)
+        assertEquals("Barbell Bench Press - Medium Grip · Barbell Squat", routine.preview)
 
-        // start routine on a day, log it, and check export round-trips
+        // start routine on a day and log it
         val day = 20000L
         repo.startRoutine(day, routine.id)
         val sets = repo.setsForDay(day).first()
-        assertEquals(6, sets.size)
+        assertEquals(7, sets.size)
         assertEquals(8, sets.first().reps)
         repo.updateSet(sets.first().id, 8, 60.0, true)
         assertEquals(60.0, repo.setsBetweenOnce(day, day).first { it.id == sets.first().id }.weight, 0.0)
 
-        val json = repo.exportRoutines(listOf(routine.id))
-        val again = repo.importRoutines(json)
-        assertEquals(0, again.created.size)
-        assertEquals(2, repo.routines.first().size)
+        // backing out of an untouched new routine discards it; an unnamed one with exercises gets a name
+        val empty = repo.createRoutine("")
+        repo.finishEditing(empty, wasNew = true)
+        val unnamed = repo.createRoutineWith("", listOf(squat.id))
+        repo.finishEditing(unnamed, wasNew = true)
+        val names = repo.routines.first().map { it.name }
+        assertEquals(2, names.size)
+        assertTrue(names.none { it.isBlank() })
+    }
+
+    @Test fun junkCleanupAndCustomDeletion() = runTest {
+        repo.ensureSeeded(ctx)
+        val junk = repo.addCustomExercise("**Protein:** about 120–145 g a day (1.6–2 g per kg at 73 kg).", "", "other")
+        val real = repo.addCustomExercise("Zercher Carry", "core", "barbell")
+        val logged = repo.addCustomExercise("Notes: keep this one, it was logged.", "", "other")
+        val rid = repo.createRoutineWith("Mixed", listOf(junk.id, real.id))
+        repo.addExercisesToDay(5L, listOf(logged.id))
+
+        assertEquals(1, repo.removeJunkCustomExercises())
+        val ids = repo.exercises.first().map { it.id }.toSet()
+        assertTrue(real.id in ids && logged.id in ids && junk.id !in ids)
+        assertEquals(1, repo.routineItems(rid).first().size)
+
+        repo.deleteCustomExercise(logged.id)
+        assertTrue(repo.setsForDay(5L).first().isEmpty())
+        // library exercises are protected
+        val lib = repo.exercises.first().first { !it.custom }
+        repo.deleteCustomExercise(lib.id)
+        assertTrue(repo.exercises.first().any { it.id == lib.id })
     }
 
     @Test fun addSetCopiesPrevious() = runTest {

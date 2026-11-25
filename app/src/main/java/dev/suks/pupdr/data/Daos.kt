@@ -27,14 +27,20 @@ interface ExerciseDao {
 
     @Query("SELECT * FROM exercises WHERE id = :id")
     suspend fun byId(id: String): Exercise?
+
+    @Query("DELETE FROM exercises WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao
 interface RoutineDao {
     @Query(
-        """SELECT r.id, r.name, r.notes, COUNT(re.id) AS exerciseCount
-           FROM routines r LEFT JOIN routine_exercises re ON re.routineId = r.id
-           GROUP BY r.id ORDER BY r.createdAt DESC"""
+        """SELECT r.id, r.name, r.notes,
+                  (SELECT COUNT(*) FROM routine_exercises re JOIN exercises e ON e.id = re.exerciseId WHERE re.routineId = r.id) AS exerciseCount,
+                  (SELECT COALESCE(SUM(re.targetSets), 0) FROM routine_exercises re JOIN exercises e ON e.id = re.exerciseId WHERE re.routineId = r.id) AS totalSets,
+                  (SELECT GROUP_CONCAT(name, ' · ') FROM (SELECT e.name AS name FROM routine_exercises re JOIN exercises e ON e.id = re.exerciseId
+                       WHERE re.routineId = r.id ORDER BY re.position LIMIT 4)) AS preview
+           FROM routines r ORDER BY r.createdAt DESC"""
     )
     fun summaries(): Flow<List<RoutineSummary>>
 
@@ -46,7 +52,7 @@ interface RoutineDao {
 
     @Query(
         """SELECT re.id, re.routineId, re.exerciseId, re.position, re.targetSets, re.targetReps,
-                  e.name AS exerciseName, e.primaryMuscles
+                  e.name AS exerciseName, e.primaryMuscles, e.category
            FROM routine_exercises re JOIN exercises e ON e.id = re.exerciseId
            WHERE re.routineId = :routineId ORDER BY re.position"""
     )
@@ -54,7 +60,7 @@ interface RoutineDao {
 
     @Query(
         """SELECT re.id, re.routineId, re.exerciseId, re.position, re.targetSets, re.targetReps,
-                  e.name AS exerciseName, e.primaryMuscles
+                  e.name AS exerciseName, e.primaryMuscles, e.category
            FROM routine_exercises re JOIN exercises e ON e.id = re.exerciseId
            WHERE re.routineId = :routineId ORDER BY re.position"""
     )
@@ -80,6 +86,9 @@ interface RoutineDao {
 
     @Query("DELETE FROM routine_exercises WHERE id = :id")
     suspend fun deleteItem(id: Long)
+
+    @Query("DELETE FROM routine_exercises WHERE exerciseId = :exerciseId")
+    suspend fun deleteItemsFor(exerciseId: String)
 
     @Query("UPDATE routine_exercises SET position = :position WHERE id = :id")
     suspend fun setPosition(id: Long, position: Int)
@@ -147,6 +156,12 @@ interface WorkoutDao {
 
     @Query("DELETE FROM workout_sets WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("DELETE FROM workout_sets WHERE exerciseId = :exerciseId")
+    suspend fun deleteAllFor(exerciseId: String)
+
+    @Query("SELECT COUNT(*) FROM workout_sets WHERE exerciseId = :exerciseId")
+    suspend fun countFor(exerciseId: String): Int
 
     @Query("DELETE FROM workout_sets WHERE epochDay = :day AND exerciseId = :exerciseId")
     suspend fun deleteExerciseOnDay(day: Long, exerciseId: String)

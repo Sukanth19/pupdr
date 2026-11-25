@@ -5,7 +5,15 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.style.TextOverflow
+import dev.suks.pupdr.ui.components.ExerciseIcon
+import dev.suks.pupdr.ui.components.TextInputDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,7 +40,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Button
@@ -72,7 +80,7 @@ import dev.suks.pupdr.ui.components.musclesLabel
 import dev.suks.pupdr.ui.components.titleCase
 import dev.suks.pupdr.ui.theme.Motion
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ExercisesScreen(vm: ExercisesViewModel, routines: List<RoutineSummary>, onLogToday: (String) -> Unit) {
     val list by vm.filtered.collectAsState()
@@ -122,14 +130,30 @@ fun ExercisesScreen(vm: ExercisesViewModel, routines: List<RoutineSummary>, onLo
                     }
                 }
             }
-            items(list, key = { it.id }) { ex ->
-                ListItem(
-                    headlineContent = { Text(ex.name) },
-                    supportingContent = { Text(listOf(musclesLabel(ex.primaryMuscles), ex.equipment.titleCase()).filter { it.isNotBlank() }.joinToString(" · ")) },
-                    leadingContent = { ExerciseAvatar(ex.name) },
-                    modifier = Modifier.animateItem(fadeInSpec = Motion.enter(), placementSpec = Motion.offsetSpring, fadeOutSpec = Motion.exit())
-                        .clickable { detail = ex },
-                )
+            list.groupBy { it.name.firstOrNull()?.uppercaseChar()?.takeIf(Char::isLetter) ?: '#' }.forEach { (letter, group) ->
+                stickyHeader(key = "h-$letter") {
+                    Text(
+                        "$letter",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 24.dp, vertical = 8.dp),
+                    )
+                }
+                items(group, key = { it.id }) { ex ->
+                    ListItem(
+                        headlineContent = { Text(ex.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                        supportingContent = {
+                            Text(
+                                listOf(musclesLabel(ex.primaryMuscles), ex.equipment.takeIf { it != "none" && it != "other" }?.titleCase().orEmpty())
+                                    .filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Your exercise" },
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        leadingContent = { ExerciseIcon(ex.category, custom = ex.custom) },
+                        modifier = Modifier.animateItem(fadeInSpec = Motion.enter(), placementSpec = Motion.offsetSpring, fadeOutSpec = Motion.exit())
+                            .clickable { detail = ex },
+                    )
+                }
             }
         }
     }
@@ -147,7 +171,7 @@ fun ExercisesScreen(vm: ExercisesViewModel, routines: List<RoutineSummary>, onLo
             filterSheet = null
         }
     }
-    detail?.let { ex -> ExerciseDetailSheet(ex, routines, vm, onDismiss = { detail = null }, onLogToday = { onLogToday(ex.id); detail = null }) }
+    detail?.let { ex -> ExerciseDetailSheet(ex, routines, vm, onDismiss = { detail = null }, onLogToday = { onLogToday(ex.id); detail = null }, onDelete = { vm.deleteCustom(ex); detail = null }) }
     if (creating) {
         CustomExerciseDialog(initialName = query, onDismiss = { creating = false }) { n, m, e -> creating = false; vm.createCustom(n, m, e) }
     }
@@ -199,16 +223,25 @@ private fun FilterSheet(title: String, options: List<String>, selected: String?,
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun ExerciseDetailSheet(ex: Exercise, routines: List<RoutineSummary>, vm: ExercisesViewModel, onDismiss: () -> Unit, onLogToday: () -> Unit) {
+private fun ExerciseDetailSheet(
+    ex: Exercise,
+    routines: List<RoutineSummary>,
+    vm: ExercisesViewModel,
+    onDismiss: () -> Unit,
+    onLogToday: () -> Unit,
+    onDelete: () -> Unit,
+) {
     var choosing by remember { mutableStateOf(false) }
+    var naming by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp).verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ExerciseAvatar(ex.name, size = 48.dp)
+                ExerciseIcon(ex.category, size = 56.dp, custom = ex.custom)
                 Spacer(Modifier.width(16.dp))
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text(ex.name, style = MaterialTheme.typography.headlineSmall)
-                    Text(musclesLabel(ex.primaryMuscles).ifBlank { "Custom exercise" }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(musclesLabel(ex.primaryMuscles).ifBlank { "Your exercise" }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -224,7 +257,13 @@ private fun ExerciseDetailSheet(ex: Exercise, routines: List<RoutineSummary>, vm
                     Icon(Icons.Default.Today, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Log it")
                 }
                 OutlinedButton(onClick = { choosing = true }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.PlaylistAdd, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("To routine")
+                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("To routine")
+                }
+            }
+            if (ex.custom) {
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = { confirmDelete = true }) {
+                    Icon(Icons.Default.Delete, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Delete exercise")
                 }
             }
             if (ex.instructions.isNotBlank()) {
@@ -245,7 +284,16 @@ private fun ExerciseDetailSheet(ex: Exercise, routines: List<RoutineSummary>, vm
     if (choosing) {
         ModalBottomSheet(onDismissRequest = { choosing = false }) {
             Text("Add to routine", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-            if (routines.isEmpty()) Text("Create a routine first in the Routines tab.", Modifier.padding(24.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ListItem(
+                headlineContent = { Text("New routine") },
+                supportingContent = { Text("Start a routine with this exercise") },
+                leadingContent = {
+                    Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onPrimary)
+                    }
+                },
+                modifier = Modifier.clickable { choosing = false; naming = true },
+            )
             routines.forEach { r ->
                 ListItem(
                     headlineContent = { Text(r.name) },
@@ -256,5 +304,21 @@ private fun ExerciseDetailSheet(ex: Exercise, routines: List<RoutineSummary>, vm
             }
             Spacer(Modifier.height(32.dp))
         }
+    }
+    if (naming) {
+        TextInputDialog("New routine", "Name", confirm = "Create", onDismiss = { naming = false }) {
+            naming = false
+            vm.createRoutineWith(it.trim(), listOf(ex.id))
+        }
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            icon = { Icon(Icons.Default.Delete, null) },
+            title = { Text("Delete ${ex.name}?") },
+            text = { Text("It's removed from your routines and from any workouts it was logged in.") },
+            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+        )
     }
 }

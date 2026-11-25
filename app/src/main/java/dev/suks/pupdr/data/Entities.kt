@@ -81,6 +81,7 @@ data class RoutineExerciseRow(
     val targetReps: String,
     val exerciseName: String,
     val primaryMuscles: String,
+    val category: String,
 )
 
 data class RoutineSummary(
@@ -88,4 +89,6 @@ data class RoutineSummary(
     val name: String,
     val notes: String,
     val exerciseCount: Int,
+    val totalSets: Int = 0,
+    val preview: String? = null,
 )

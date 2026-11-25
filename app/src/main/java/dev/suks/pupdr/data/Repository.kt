@@ -2,17 +2,12 @@ package dev.suks.pupdr.data
 
 import android.content.Context
 import androidx.room.withTransaction
-import dev.suks.pupdr.domain.DraftItem
-import dev.suks.pupdr.domain.DraftRoutine
-import dev.suks.pupdr.domain.ExerciseMatcher
 import dev.suks.pupdr.domain.RoutineCodec
 import dev.suks.pupdr.domain.RoutineDto
 import dev.suks.pupdr.domain.RoutineItemDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
-
-data class ImportResult(val routines: Int, val exercises: Int, val created: List<String>)
 
 class Repository(private val db: PupdrDatabase) {
     private val exerciseDao = db.exercises()
@@ -45,18 +40,61 @@ class Repository(private val db: PupdrDatabase) {
         return ex
     }
 
+    /** Deletes a user-created exercise everywhere it's used. Library exercises can't be deleted. */
+    suspend fun deleteCustomExercise(id: String) = db.withTransaction {
+        val ex = exerciseDao.byId(id) ?: return@withTransaction
+        if (!ex.custom) return@withTransaction
+        workoutDao.deleteAllFor(id)
+        routineDao.deleteItemsFor(id)
+        exerciseDao.delete(id)
+    }
+
+    /**
+     * One-off cleanup for the old text importer, which turned lines of notes into "custom exercises".
+     * Removes custom exercises that read like sentences and were never logged.
+     */
+    suspend fun removeJunkCustomExercises(): Int = db.withTransaction {
+        val junk = exerciseDao.allOnce().filter { it.custom && looksLikeProse(it.name) && workoutDao.countFor(it.id) == 0 }
+        junk.forEach {
+            routineDao.deleteItemsFor(it.id)
+            exerciseDao.delete(it.id)
+        }
+        junk.size
+    }
+
+    private fun looksLikeProse(name: String): Boolean =
+        name.length > 40 || name.split(' ').size > 6 || name.contains("**") ||
+            Regex("""[.:!?·=]""").containsMatchIn(name) || name.count { it.isDigit() } > 3
+
     // ---- routines
     val routines: Flow<List<RoutineSummary>> = routineDao.summaries()
     fun routine(id: Long) = routineDao.routine(id)
     fun routineItems(id: Long) = routineDao.items(id)
 
-    suspend fun createRoutine(name: String): Long = routineDao.insert(Routine(name = name.trim().ifEmpty { "New routine" }))
+    suspend fun createRoutine(name: String): Long = routineDao.insert(Routine(name = name.trim()))
 
     suspend fun renameRoutine(id: Long, name: String, notes: String) {
-        routineDao.routineOnce(id)?.let { routineDao.update(it.copy(name = name.trim().ifEmpty { it.name }, notes = notes)) }
+        routineDao.routineOnce(id)?.let { routineDao.update(it.copy(name = name, notes = notes)) }
     }
 
     suspend fun deleteRoutine(id: Long) = routineDao.delete(id)
+
+    /** Creates a routine already containing [exerciseIds]. */
+    suspend fun createRoutineWith(name: String, exerciseIds: List<String>): Long = db.withTransaction {
+        val id = createRoutine(name)
+        addToRoutine(id, exerciseIds)
+        id
+    }
+
+    /** Called when leaving a routine editor: unnamed ones get a name, untouched new ones are discarded. */
+    suspend fun finishEditing(id: Long, wasNew: Boolean) {
+        val r = routineDao.routineOnce(id) ?: return
+        val count = routineDao.itemsOnce(id).size
+        when {
+            wasNew && count == 0 && r.name.isBlank() -> routineDao.delete(id)
+            r.name.isBlank() -> routineDao.update(r.copy(name = "Routine ${id}"))
+        }
+    }
 
     suspend fun addToRoutine(routineId: Long, exerciseIds: List<String>) = db.withTransaction {
         var pos = routineDao.maxPosition(routineId)
@@ -86,43 +124,6 @@ class Repository(private val db: PupdrDatabase) {
             )
         }
         return RoutineCodec.encode(dtos)
-    }
-
-    /** Parses any routine text/JSON into drafts matched against the library, for review before saving. */
-    suspend fun draftImport(text: String): List<DraftRoutine> = withContext(Dispatchers.Default) {
-        val matcher = ExerciseMatcher(exerciseDao.allOnce())
-        var key = 0L
-        RoutineCodec.decode(text, matcher::isKnown).map { dto ->
-            DraftRoutine(key++, dto.name, dto.exercises.map { item ->
-                val m = matcher.match(item.name, item.id)
-                DraftItem(key++, item.name, m?.exercise?.id, m?.exercise?.name ?: item.name, m?.score ?: 0.0, item.sets, item.reps)
-            })
-        }.filter { it.items.isNotEmpty() }
-    }
-
-    /** Saves reviewed drafts; unmatched items become custom exercises. */
-    suspend fun commitImport(drafts: List<DraftRoutine>): ImportResult = db.withTransaction {
-        val created = linkedSetOf<String>()
-        var count = 0
-        for (d in drafts) {
-            if (d.items.isEmpty()) continue
-            val rid = routineDao.insert(Routine(name = d.name.ifBlank { "Imported routine" }))
-            routineDao.insertItems(d.items.mapIndexed { i, item ->
-                val id = item.exerciseId ?: run {
-                    val existing = exerciseDao.byId(RoutineCodec.customId(item.exerciseName))
-                    existing?.id ?: addCustomExercise(item.exerciseName, "", "other").also { created += it.name }.id
-                }
-                count++
-                RoutineExercise(routineId = rid, exerciseId = id, position = i, targetSets = item.sets.coerceIn(1, 50), targetReps = item.reps)
-            })
-        }
-        ImportResult(drafts.count { it.items.isNotEmpty() }, count, created.toList())
-    }
-
-    suspend fun importRoutines(text: String): ImportResult {
-        val drafts = draftImport(text)
-        require(drafts.isNotEmpty()) { "No exercises found" }
-        return commitImport(drafts)
     }
 
     // ---- workouts

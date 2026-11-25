@@ -25,6 +25,10 @@ class PupdrApp : Application() {
         prefs = Prefs(this)
         appScope.launch {
             repo.ensureSeeded(this@PupdrApp)
+            if (!prefs.junkCleaned) {
+                repo.removeJunkCustomExercises()
+                prefs.junkCleaned = true
+            }
             _ready.value = true
         }
     }

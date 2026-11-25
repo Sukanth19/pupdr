@@ -6,8 +6,6 @@ import dev.suks.pupdr.PupdrApp
 import dev.suks.pupdr.data.Exercise
 import dev.suks.pupdr.data.SetWithExercise
 import dev.suks.pupdr.domain.DateRange
-import dev.suks.pupdr.domain.DraftItem
-import dev.suks.pupdr.domain.DraftRoutine
 import dev.suks.pupdr.domain.Granularity
 import dev.suks.pupdr.domain.Periods
 import dev.suks.pupdr.domain.Report
@@ -23,7 +21,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -37,7 +34,7 @@ class Messages {
     fun send(msg: String) { _flow.tryEmit(msg) }
 }
 
-data class ExerciseGroup(val exerciseId: String, val name: String, val muscles: String, val sets: List<SetWithExercise>) {
+data class ExerciseGroup(val exerciseId: String, val name: String, val muscles: String, val category: String, val sets: List<SetWithExercise>) {
     val done get() = sets.count { it.done }
 }
 
@@ -51,7 +48,7 @@ class WorkoutViewModel(private val app: PupdrApp, private val messages: Messages
     val groups: StateFlow<List<ExerciseGroup>> = day.flatMapLatest { repo.setsForDay(it.toEpochDay()) }
         .map { sets ->
             sets.groupBy { it.exerciseId }.map { (id, list) ->
-                ExerciseGroup(id, list.first().exerciseName, list.first().primaryMuscles, list.sortedBy { it.setIndex })
+                ExerciseGroup(id, list.first().exerciseName, list.first().primaryMuscles, list.first().category, list.sortedBy { it.setIndex })
             }
         }.state(this, emptyList())
 
@@ -106,6 +103,16 @@ class ExercisesViewModel(private val app: PupdrApp, private val messages: Messag
         messages.send("Added to $routineName")
     }
 
+    fun createRoutineWith(name: String, ids: List<String>) = viewModelScope.launch {
+        repo.createRoutineWith(name, ids)
+        messages.send("Created $name")
+    }
+
+    fun deleteCustom(ex: Exercise) = viewModelScope.launch {
+        repo.deleteCustomExercise(ex.id)
+        messages.send("Deleted ${ex.name}")
+    }
+
     companion object {
         fun filter(list: List<Exercise>, q: String, m: String?, e: String?): List<Exercise> {
             val tokens = q.lowercase().split(' ').filter { it.isNotBlank() }
@@ -122,47 +129,9 @@ class RoutinesViewModel(private val app: PupdrApp, private val messages: Message
     private val repo = app.repo
     val routines = repo.routines.state(this, emptyList())
 
-    /** Parsed import waiting for the user to review; null when no review is open. */
-    val draft = MutableStateFlow<List<DraftRoutine>?>(null)
-    val parsing = MutableStateFlow(false)
-
-    fun create(name: String, then: (Long) -> Unit) = viewModelScope.launch { then(repo.createRoutine(name)) }
+    /** Creates an empty routine and hands back its id so the editor can open straight into the exercise picker. */
+    fun createNew(then: (Long) -> Unit) = viewModelScope.launch { then(repo.createRoutine("")) }
     fun delete(id: Long) = viewModelScope.launch { repo.deleteRoutine(id) }
-
-    /** Parses text and opens the review sheet. Returns false via [onEmpty] if nothing usable was found. */
-    fun preview(text: String, onEmpty: () -> Unit = {}) = viewModelScope.launch {
-        parsing.value = true
-        val result = runCatching { repo.draftImport(text) }.getOrDefault(emptyList())
-        parsing.value = false
-        if (result.isEmpty()) {
-            messages.send("Couldn't find any exercises in that. Try one exercise per line, like \"Bench press 4x8\".")
-            onEmpty()
-        } else draft.value = result
-    }
-
-    fun editDraft(f: (List<DraftRoutine>) -> List<DraftRoutine>) = draft.update { it?.let(f) }
-
-    fun updateItem(routineKey: Long, item: DraftItem) = editDraft { list ->
-        list.map { r -> if (r.key != routineKey) r else r.copy(items = r.items.map { if (it.key == item.key) item else it }) }
-    }
-
-    fun removeItem(routineKey: Long, itemKey: Long) = editDraft { list ->
-        list.map { r -> if (r.key != routineKey) r else r.copy(items = r.items.filterNot { it.key == itemKey }) }
-    }
-
-    fun renameDraft(routineKey: Long, name: String) = editDraft { list -> list.map { if (it.key == routineKey) it.copy(name = name) else it } }
-    fun removeDraftRoutine(routineKey: Long) = editDraft { list -> list.filterNot { it.key == routineKey } }
-
-    fun commit() = viewModelScope.launch {
-        val d = draft.value ?: return@launch
-        runCatching { repo.commitImport(d) }
-            .onSuccess { r ->
-                draft.value = null
-                val extra = if (r.created.isNotEmpty()) " · ${r.created.size} new custom" else ""
-                messages.send("Imported ${r.routines} routine${if (r.routines != 1) "s" else ""} · ${r.exercises} exercises$extra")
-            }
-            .onFailure { messages.send("Import failed: ${it.message}") }
-    }
 
     fun export(ids: List<Long>, then: (String) -> Unit) = viewModelScope.launch { then(repo.exportRoutines(ids)) }
 
@@ -183,6 +152,9 @@ class RoutineDetailViewModel(private val app: PupdrApp, val routineId: Long) : V
     fun updateTarget(itemId: Long, sets: Int, reps: String) = viewModelScope.launch { repo.updateTarget(itemId, sets, reps) }
     fun remove(itemId: Long) = viewModelScope.launch { repo.removeRoutineItem(itemId) }
     fun move(itemId: Long, delta: Int) = viewModelScope.launch { repo.moveRoutineItem(routineId, itemId, delta) }
+
+    /** Runs in the app scope so it completes even as this screen's ViewModel is cleared. */
+    fun finish(wasNew: Boolean) = app.appScope.launch { repo.finishEditing(routineId, wasNew) }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
