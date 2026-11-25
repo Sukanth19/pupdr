@@ -172,3 +172,48 @@ object ReportBuilder {
         }
     }
 }
+
+/** Habit and nutrition numbers for a report period. */
+data class DailyStats(
+    val days: Long,
+    val creatineDays: Int,
+    val waterGoalDays: Int,
+    val avgWater: Double,
+    val foodDays: Int,
+    val avgProtein: Double,
+    val avgCalories: Double,
+) {
+    val isEmpty get() = creatineDays == 0 && waterGoalDays == 0 && avgWater == 0.0 && foodDays == 0
+
+    companion object {
+        /** [logs] are (epochDay, key, value); [food] are (epochDay, protein, calories). Averages are over days with entries. */
+        fun build(
+            range: DateRange,
+            logs: List<Triple<Long, String, Double>>,
+            food: List<Triple<Long, Double, Int>>,
+            waterGoal: Int,
+        ): DailyStats {
+            val water = logs.filter { it.second == "water" && it.third > 0 }
+            val byDay = food.groupBy { it.first }
+            return DailyStats(
+                days = range.days,
+                creatineDays = logs.count { it.second == "creatine" && it.third >= 1 },
+                waterGoalDays = water.count { it.third >= waterGoal },
+                avgWater = if (water.isEmpty()) 0.0 else water.sumOf { it.third } / water.size,
+                foodDays = byDay.size,
+                avgProtein = if (byDay.isEmpty()) 0.0 else byDay.values.sumOf { d -> d.sumOf { it.second } } / byDay.size,
+                avgCalories = if (byDay.isEmpty()) 0.0 else byDay.values.sumOf { d -> d.sumOf { it.third }.toDouble() } / byDay.size,
+            )
+        }
+    }
+}
+
+fun DailyStats.toText(): String = buildString {
+    appendLine("HABITS & NUTRITION")
+    appendLine("  Creatine     : $creatineDays of $days days")
+    appendLine("  Water goal   : $waterGoalDays of $days days (avg ${ReportBuilder.fmt(avgWater)} glasses)")
+    if (foodDays > 0) {
+        appendLine("  Protein      : ${ReportBuilder.fmt(avgProtein)} g/day avg ($foodDays days logged)")
+        appendLine("  Calories     : ${ReportBuilder.fmt(avgCalories)} kcal/day avg")
+    }
+}

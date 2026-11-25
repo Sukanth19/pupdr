@@ -5,7 +5,11 @@ import androidx.lifecycle.viewModelScope
 import dev.suks.pupdr.PupdrApp
 import dev.suks.pupdr.data.Exercise
 import dev.suks.pupdr.data.SetWithExercise
+import dev.suks.pupdr.data.FoodEntry
+import dev.suks.pupdr.domain.DailyStats
 import dev.suks.pupdr.domain.DateRange
+import dev.suks.pupdr.ecosystem.Spend
+import kotlinx.coroutines.Dispatchers
 import dev.suks.pupdr.domain.Granularity
 import dev.suks.pupdr.domain.Periods
 import dev.suks.pupdr.domain.Report
@@ -63,6 +67,39 @@ class WorkoutViewModel(private val app: PupdrApp, private val messages: Messages
         while (d in set) { n++; d-- }
         n
     }.state(this, 0)
+
+    // daily habits, nutrition and linked apps
+    val daily: StateFlow<Map<String, Double>> = day.flatMapLatest { repo.dailyLogs(it.toEpochDay()) }.state(this, emptyMap())
+    val food: StateFlow<List<FoodEntry>> = day.flatMapLatest { repo.foodFor(it.toEpochDay()) }.state(this, emptyList())
+    val waterGoal = app.prefs.waterGoal
+    val proteinGoal = app.prefs.proteinGoal
+    val calorieGoal = app.prefs.calorieGoal
+    val syncVelto = app.prefs.syncVelto
+    val syncMidas = app.prefs.syncMidas
+    val veltoInstalled = MutableStateFlow(false)
+    val midasInstalled = MutableStateFlow(false)
+
+    init { refreshLinks() }
+
+    fun refreshLinks() = viewModelScope.launch(Dispatchers.IO) {
+        veltoInstalled.value = app.bridge.veltoInstalled()
+        midasInstalled.value = app.bridge.midasInstalled()
+    }
+
+    fun addWater(delta: Int) = viewModelScope.launch { repo.addWater(day.value.toEpochDay(), delta) }
+    fun setCreatine(taken: Boolean) = viewModelScope.launch { repo.setCreatine(day.value.toEpochDay(), taken) }
+    fun addFood(name: String, protein: Double, calories: Int) = viewModelScope.launch { repo.addFood(day.value.toEpochDay(), name, protein, calories) }
+    fun deleteFood(id: Long) = viewModelScope.launch { repo.deleteFood(id) }
+    fun setWaterGoal(v: Int) = app.prefs.setWaterGoal(v)
+    fun setProteinGoal(v: Int) = app.prefs.setProteinGoal(v)
+    fun setCalorieGoal(v: Int) = app.prefs.setCalorieGoal(v)
+    fun setSyncVelto(on: Boolean) = app.prefs.setSyncVelto(on)
+    fun setSyncMidas(on: Boolean) = app.prefs.setSyncMidas(on)
+
+    fun addToMidas(item: String) = viewModelScope.launch {
+        if (app.bridge.addToMidasBuyList(item)) messages.send("Added $item to your Midas buy list")
+        else messages.send("Couldn't reach Midas")
+    }
 
     fun setDay(d: LocalDate) { day.value = d }
     fun setUnit(u: String) = app.prefs.setUnit(u)
@@ -182,6 +219,16 @@ class ReportsViewModel(private val app: PupdrApp) : ViewModel() {
     val report: StateFlow<Report?> = combine(range, unit) { r, u -> r to u }
         .flatMapLatest { (r, u) -> repo.setsBetween(r.from.toEpochDay(), r.to.toEpochDay()).map { ReportBuilder.build(r, it, u) } }
         .state(this, null)
+
+    val daily: StateFlow<DailyStats?> = combine(range, app.prefs.waterGoal) { r, g -> r to g }
+        .flatMapLatest { (r, goal) ->
+            combine(repo.dailyBetween(r.from.toEpochDay(), r.to.toEpochDay()), repo.foodBetween(r.from.toEpochDay(), r.to.toEpochDay())) { logs, food ->
+                DailyStats.build(r, logs.map { Triple(it.epochDay, it.key, it.value) }, food.map { Triple(it.epochDay, it.protein, it.calories) }, goal)
+            }
+        }.state(this, null)
+
+    /** Gym and supplement spending from Midas for the period, when Midas is installed. */
+    val fitnessSpend: StateFlow<Spend?> = range.map { r -> app.bridge.fitnessSpend(r.from.toEpochDay(), r.to.toEpochDay()) }.state(this, null)
 
     fun select(g: Granularity) {
         if (g == Granularity.ALL) refreshFirstDay()

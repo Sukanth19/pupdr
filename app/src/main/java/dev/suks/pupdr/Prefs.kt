@@ -11,6 +11,26 @@ class Prefs(context: Context) {
     private val _dynamic = MutableStateFlow(sp.getBoolean("dynamic_color_v2", false))
     val dynamicColor: StateFlow<Boolean> = _dynamic
 
+    private fun intFlow(key: String, def: Int) = MutableStateFlow(sp.getInt(key, def))
+    private val _waterGoal = intFlow("water_goal", 8)
+    private val _proteinGoal = intFlow("protein_goal", 140)
+    private val _calorieGoal = intFlow("calorie_goal", 2500)
+    private val _syncVelto = MutableStateFlow(sp.getBoolean("sync_velto", true))
+    private val _syncMidas = MutableStateFlow(sp.getBoolean("sync_midas", true))
+    /** Glasses of water a day. */
+    val waterGoal: StateFlow<Int> = _waterGoal
+    /** Grams of protein a day. */
+    val proteinGoal: StateFlow<Int> = _proteinGoal
+    val calorieGoal: StateFlow<Int> = _calorieGoal
+    val syncVelto: StateFlow<Boolean> = _syncVelto
+    val syncMidas: StateFlow<Boolean> = _syncMidas
+
+    fun setWaterGoal(v: Int) { val c = v.coerceIn(1, 30); sp.edit().putInt("water_goal", c).apply(); _waterGoal.value = c }
+    fun setProteinGoal(v: Int) { val c = v.coerceIn(10, 500); sp.edit().putInt("protein_goal", c).apply(); _proteinGoal.value = c }
+    fun setCalorieGoal(v: Int) { val c = v.coerceIn(500, 8000); sp.edit().putInt("calorie_goal", c).apply(); _calorieGoal.value = c }
+    fun setSyncVelto(on: Boolean) { sp.edit().putBoolean("sync_velto", on).apply(); _syncVelto.value = on }
+    fun setSyncMidas(on: Boolean) { sp.edit().putBoolean("sync_midas", on).apply(); _syncMidas.value = on }
+
     var junkCleaned: Boolean
         get() = sp.getBoolean("junk_cleaned_v1", false)
         set(v) { sp.edit().putBoolean("junk_cleaned_v1", v).apply() }

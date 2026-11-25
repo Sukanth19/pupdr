@@ -76,7 +76,10 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.suks.pupdr.domain.DailyStats
 import dev.suks.pupdr.domain.DateRange
+import dev.suks.pupdr.domain.toText
+import dev.suks.pupdr.ecosystem.Spend
 import dev.suks.pupdr.domain.Granularity
 import dev.suks.pupdr.domain.Report
 import dev.suks.pupdr.domain.ReportBuilder
@@ -100,7 +103,11 @@ fun ReportsScreen(vm: ReportsViewModel) {
     val title by vm.title.collectAsState()
     val report by vm.report.collectAsState()
     val unit by vm.unit.collectAsState()
+    val daily by vm.daily.collectAsState()
+    val spend by vm.fitnessSpend.collectAsState()
     val context = LocalContext.current
+    fun fullText(r: Report) = ReportBuilder.toText(r) + (daily?.takeIf { !it.isEmpty }?.let { "\n" + it.toText() } ?: "") +
+        (spend?.let { "\nGym & supplement spending (Midas): ${it.format()}\n" } ?: "")
     var pickingRange by remember { mutableStateOf(false) }
     var exporting by remember { mutableStateOf(false) }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
@@ -112,7 +119,7 @@ fun ReportsScreen(vm: ReportsViewModel) {
     }
     val saveTxt = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         val r = report
-        if (uri != null && r != null) Exporter.writeTo(context, uri, ReportBuilder.toText(r))
+        if (uri != null && r != null) Exporter.writeTo(context, uri, fullText(r))
     }
 
     Scaffold(
@@ -171,6 +178,8 @@ fun ReportsScreen(vm: ReportsViewModel) {
             val r = report
             if (r != null) {
                 item(key = "stats") { StatsGrid(r, unit) }
+                val d = daily
+                if ((d != null && !d.isEmpty) || spend != null) item(key = "habits") { HabitsCard(d, spend) }
                 if (r.totalSets == 0) {
                     item(key = "empty") {
                         EmptyState(Icons.Default.Insights, "No workouts in this period", "Log a few sets and your stats will show up here.", Modifier.animateItem())
@@ -195,7 +204,7 @@ fun ReportsScreen(vm: ReportsViewModel) {
                     exporting = false; Exporter.share(context, "$baseName.csv", "text/csv", ReportBuilder.toCsv(r))
                 }
                 ExportRow(Icons.Default.Description, "Share summary (text)", "Totals, muscles, PRs and the full log") {
-                    exporting = false; Exporter.share(context, "$baseName.txt", "text/plain", ReportBuilder.toText(r))
+                    exporting = false; Exporter.share(context, "$baseName.txt", "text/plain", fullText(r))
                 }
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 ExportRow(Icons.Default.SaveAlt, "Save CSV to device", null) { exporting = false; saveCsv.launch("$baseName.csv") }
@@ -355,6 +364,52 @@ private fun ExerciseTable(r: Report, unit: String) {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HabitsCard(d: DailyStats?, spend: Spend?) {
+    SectionCard("Habits & nutrition") {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (d != null && !d.isEmpty) {
+                HabitLine("Creatine", "${d.creatineDays} of ${d.days} days", d.creatineDays.toFloat() / d.days)
+                HabitLine("Water goal", "${d.waterGoalDays} of ${d.days} days", d.waterGoalDays.toFloat() / d.days)
+                if (d.foodDays > 0) {
+                    Row {
+                        Text("Protein", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text("${ReportBuilder.fmt(d.avgProtein)} g/day", style = MaterialTheme.typography.titleSmall)
+                    }
+                    Row {
+                        Text("Calories", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text("${ReportBuilder.fmt(d.avgCalories)} kcal/day", style = MaterialTheme.typography.titleSmall)
+                    }
+                }
+            }
+            if (spend != null) {
+                Row {
+                    Column(Modifier.weight(1f)) {
+                        Text("Gym & supplements", style = MaterialTheme.typography.bodyLarge)
+                        Text("From Midas", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text(spend.format(), style = MaterialTheme.typography.titleSmall)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HabitLine(label: String, value: String, fraction: Float) {
+    val p by animateFloatAsState(fraction.coerceIn(0f, 1f), Motion.standard(Motion.LONG), label = "habit-$label")
+    Column {
+        Row {
+            Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Text(value, style = MaterialTheme.typography.titleSmall)
+        }
+        Spacer(Modifier.height(6.dp))
+        Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+            Box(Modifier.fillMaxWidth(p).height(8.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.primary))
         }
     }
 }

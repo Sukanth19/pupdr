@@ -6,13 +6,20 @@ import dev.suks.pupdr.domain.RoutineCodec
 import dev.suks.pupdr.domain.RoutineDto
 import dev.suks.pupdr.domain.RoutineItemDto
 import kotlinx.coroutines.Dispatchers
+import dev.suks.pupdr.ecosystem.Ecosystem
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 class Repository(private val db: PupdrDatabase) {
     private val exerciseDao = db.exercises()
     private val routineDao = db.routines()
     private val workoutDao = db.workouts()
+    private val dailyDao = db.daily()
+
+    /** Called when a linked habit (creatine, water, workout) flips done/not done because of something done in pupdr. */
+    var onHabitChanged: (key: String, day: Long, done: Boolean) -> Unit = { _, _, _ -> }
+    var waterGoal: () -> Int = { 8 }
 
     suspend fun ensureSeeded(context: Context) = withContext(Dispatchers.IO) {
         if (exerciseDao.count() == 0) {
@@ -158,7 +165,67 @@ class Repository(private val db: PupdrDatabase) {
         workoutDao.insert(WorkoutSet(epochDay = day, exerciseId = exerciseId, setIndex = idx, reps = copyFrom?.reps ?: 0, weight = copyFrom?.weight ?: 0.0))
     }
 
-    suspend fun updateSet(id: Long, reps: Int, weight: Double, done: Boolean) = workoutDao.update(id, reps, weight, done)
-    suspend fun deleteSet(id: Long) = workoutDao.delete(id)
-    suspend fun removeExerciseFromDay(day: Long, exerciseId: String) = workoutDao.deleteExerciseOnDay(day, exerciseId)
+    suspend fun updateSet(id: Long, reps: Int, weight: Double, done: Boolean) {
+        val day = workoutDao.dayOf(id) ?: return
+        trackWorkout(day) { workoutDao.update(id, reps, weight, done) }
+    }
+    suspend fun deleteSet(id: Long) {
+        val day = workoutDao.dayOf(id) ?: return
+        trackWorkout(day) { workoutDao.delete(id) }
+    }
+    suspend fun removeExerciseFromDay(day: Long, exerciseId: String) = trackWorkout(day) { workoutDao.deleteExerciseOnDay(day, exerciseId) }
+
+    /** A day counts as a workout once any set is ticked done; tell linked apps when that flips. */
+    private suspend fun trackWorkout(day: Long, change: suspend () -> Unit) {
+        val before = workoutDao.doneCountOn(day) > 0
+        change()
+        val after = workoutDao.doneCountOn(day) > 0
+        if (before != after) onHabitChanged(Ecosystem.Habits.WORKOUT, day, after)
+    }
+
+    // ---- daily habits & food
+    fun dailyLogs(day: Long): Flow<Map<String, Double>> = dailyDao.logsFor(day).map { list -> list.associate { it.key to it.value } }
+    fun dailyBetween(from: Long, to: Long) = dailyDao.logsBetween(from, to)
+    fun foodFor(day: Long) = dailyDao.foodFor(day)
+    fun foodBetween(from: Long, to: Long) = dailyDao.foodBetween(from, to)
+
+    private fun isDone(key: String, value: Double) = when (key) {
+        Ecosystem.Habits.WATER -> value >= waterGoal()
+        else -> value >= 1.0
+    }
+
+    /** Sets a daily habit value. [fromLinkedApp] suppresses echoing the change back to where it came from. */
+    suspend fun setDaily(day: Long, key: String, value: Double, fromLinkedApp: Boolean = false) {
+        val old = dailyDao.value(day, key) ?: 0.0
+        val new = value.coerceAtLeast(0.0)
+        if (old == new) return
+        dailyDao.put(DailyLog(day, key, new))
+        if (!fromLinkedApp && isDone(key, old) != isDone(key, new)) onHabitChanged(key, day, isDone(key, new))
+    }
+
+    suspend fun addWater(day: Long, glasses: Int) = setDaily(day, Ecosystem.Habits.WATER, (dailyDao.value(day, Ecosystem.Habits.WATER) ?: 0.0) + glasses)
+    suspend fun setCreatine(day: Long, taken: Boolean) = setDaily(day, Ecosystem.Habits.CREATINE, if (taken) 1.0 else 0.0)
+
+    suspend fun habitDone(key: String, day: Long): Boolean = when (key) {
+        Ecosystem.Habits.WORKOUT -> workoutDao.doneCountOn(day) > 0
+        else -> isDone(key, dailyDao.value(day, key) ?: 0.0)
+    }
+
+    /** A habit was ticked or unticked in a linked app (Velto). */
+    suspend fun applyLinkedHabit(key: String, day: Long, done: Boolean) {
+        val current = dailyDao.value(day, key) ?: 0.0
+        when (key) {
+            Ecosystem.Habits.CREATINE -> setDaily(day, key, if (done) 1.0 else 0.0, fromLinkedApp = true)
+            Ecosystem.Habits.WATER -> {
+                val goal = waterGoal().toDouble()
+                if (done && current < goal) setDaily(day, key, goal, fromLinkedApp = true)
+                if (!done && current >= goal) setDaily(day, key, goal - 1, fromLinkedApp = true)
+            }
+            // a workout can't be invented from a tick in another app; pupdr owns that one
+        }
+    }
+
+    suspend fun addFood(day: Long, name: String, protein: Double, calories: Int) =
+        dailyDao.addFood(FoodEntry(epochDay = day, name = name.trim().ifEmpty { "Food" }, protein = protein.coerceAtLeast(0.0), calories = calories.coerceAtLeast(0)))
+    suspend fun deleteFood(id: Long) = dailyDao.deleteFood(id)
 }

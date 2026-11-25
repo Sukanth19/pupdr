@@ -103,4 +103,45 @@ class RepositoryTest {
         repo.addExercisesToDay(2L, listOf(id))
         assertEquals(20.0, repo.setsForDay(2L).first().single().weight, 0.0)
     }
+
+    @Test fun linkedHabitsSyncWithoutEchoes() = runTest {
+        repo.ensureSeeded(ctx)
+        val events = mutableListOf<Triple<String, Long, Boolean>>()
+        repo.onHabitChanged = { k, d, done -> events += Triple(k, d, done) }
+        repo.waterGoal = { 3 }
+        val day = 100L
+
+        // water only "flips" when the goal is crossed
+        repo.addWater(day, 1); repo.addWater(day, 1)
+        assertTrue(events.isEmpty())
+        repo.addWater(day, 1)
+        assertEquals(Triple("water", day, true), events.single())
+        repo.addWater(day, -1)
+        assertEquals(Triple("water", day, false), events.last())
+
+        repo.setCreatine(day, true)
+        assertEquals(Triple("creatine", day, true), events.last())
+
+        // changes coming from Velto are applied but not echoed back
+        events.clear()
+        repo.applyLinkedHabit("creatine", day + 1, true)
+        repo.applyLinkedHabit("water", day + 1, true)
+        assertTrue(events.isEmpty())
+        assertTrue(repo.habitDone("creatine", day + 1))
+        assertTrue(repo.habitDone("water", day + 1))
+        repo.applyLinkedHabit("water", day + 1, false)
+        assertEquals(false, repo.habitDone("water", day + 1))
+
+        // a workout is "done" once any set is ticked
+        val ex = repo.exercises.first().first().id
+        repo.addExercisesToDay(day, listOf(ex))
+        val set = repo.setsForDay(day).first().single()
+        repo.updateSet(set.id, 8, 20.0, true)
+        assertEquals(Triple("workout", day, true), events.last())
+        repo.deleteSet(set.id)
+        assertEquals(Triple("workout", day, false), events.last())
+
+        repo.addFood(day, "Protein shake", 25.0, 120)
+        assertEquals(25.0, repo.foodFor(day).first().single().protein, 0.0)
+    }
 }

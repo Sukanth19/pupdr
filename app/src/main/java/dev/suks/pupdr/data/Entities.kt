@@ -92,3 +92,18 @@ data class RoutineSummary(
     val totalSets: Int = 0,
     val preview: String? = null,
 )
+
+/** A per-day number for a daily habit: glasses of water, creatine taken (0/1). */
+@Entity(tableName = "daily_logs", primaryKeys = ["epochDay", "key"])
+data class DailyLog(val epochDay: Long, val key: String, val value: Double)
+
+/** Something eaten, for the protein / calorie tally. */
+@Entity(tableName = "food_entries", indices = [Index("epochDay")])
+data class FoodEntry(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val epochDay: Long,
+    val name: String,
+    val protein: Double,
+    val calories: Int,
+    val createdAt: Long = System.currentTimeMillis(),
+)

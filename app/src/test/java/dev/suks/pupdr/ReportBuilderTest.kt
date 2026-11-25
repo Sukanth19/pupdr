@@ -55,4 +55,20 @@ class ReportBuilderTest {
         val r = ReportBuilder.build(DateRange(d, d), listOf(set(d, "bench", 1, 5, 50.0).copy(exerciseName = "Press, \"heavy\"")))
         assertTrue(ReportBuilder.toCsv(r).contains("\"Press, \"\"heavy\"\"\""))
     }
+
+    @Test fun dailyStats() {
+        val r = DateRange(d.minusDays(6), d)
+        val logs = listOf(
+            Triple(d.toEpochDay(), "creatine", 1.0), Triple(d.minusDays(1).toEpochDay(), "creatine", 1.0),
+            Triple(d.toEpochDay(), "water", 8.0), Triple(d.minusDays(2).toEpochDay(), "water", 4.0),
+        )
+        val food = listOf(Triple(d.toEpochDay(), 100.0, 1500), Triple(d.toEpochDay(), 40.0, 500), Triple(d.minusDays(1).toEpochDay(), 120.0, 2000))
+        val s = dev.suks.pupdr.domain.DailyStats.build(r, logs, food, waterGoal = 8)
+        assertEquals(2, s.creatineDays)
+        assertEquals(1, s.waterGoalDays)
+        assertEquals(6.0, s.avgWater, 0.0)
+        assertEquals(2, s.foodDays)
+        assertEquals(130.0, s.avgProtein, 0.001)
+        assertEquals(2000.0, s.avgCalories, 0.001)
+    }
 }

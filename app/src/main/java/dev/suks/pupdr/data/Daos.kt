@@ -163,6 +163,39 @@ interface WorkoutDao {
     @Query("SELECT COUNT(*) FROM workout_sets WHERE exerciseId = :exerciseId")
     suspend fun countFor(exerciseId: String): Int
 
+    @Query("SELECT COUNT(*) FROM workout_sets WHERE epochDay = :day AND done = 1")
+    suspend fun doneCountOn(day: Long): Int
+
+    @Query("SELECT epochDay FROM workout_sets WHERE id = :id")
+    suspend fun dayOf(id: Long): Long?
+
     @Query("DELETE FROM workout_sets WHERE epochDay = :day AND exerciseId = :exerciseId")
     suspend fun deleteExerciseOnDay(day: Long, exerciseId: String)
+}
+
+@Dao
+interface DailyDao {
+    @Query("SELECT * FROM daily_logs WHERE epochDay = :day")
+    fun logsFor(day: Long): Flow<List<DailyLog>>
+
+    @Query("SELECT * FROM daily_logs WHERE epochDay BETWEEN :from AND :to")
+    fun logsBetween(from: Long, to: Long): Flow<List<DailyLog>>
+
+    @Query("SELECT value FROM daily_logs WHERE epochDay = :day AND `key` = :key")
+    suspend fun value(day: Long, key: String): Double?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun put(log: DailyLog)
+
+    @Query("SELECT * FROM food_entries WHERE epochDay = :day ORDER BY createdAt")
+    fun foodFor(day: Long): Flow<List<FoodEntry>>
+
+    @Query("SELECT * FROM food_entries WHERE epochDay BETWEEN :from AND :to ORDER BY epochDay, createdAt")
+    fun foodBetween(from: Long, to: Long): Flow<List<FoodEntry>>
+
+    @Insert
+    suspend fun addFood(entry: FoodEntry): Long
+
+    @Query("DELETE FROM food_entries WHERE id = :id")
+    suspend fun deleteFood(id: Long)
 }

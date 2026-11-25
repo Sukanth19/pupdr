@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
@@ -138,6 +139,17 @@ fun WorkoutScreen(vm: WorkoutViewModel, exVm: ExercisesViewModel) {
     var choosingRoutine by remember { mutableStateOf(false) }
     var pickingDate by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
+    var nutrition by remember { mutableStateOf(false) }
+    var goals by remember { mutableStateOf(false) }
+    val daily by vm.daily.collectAsState()
+    val food by vm.food.collectAsState()
+    val waterGoal by vm.waterGoal.collectAsState()
+    val proteinGoal by vm.proteinGoal.collectAsState()
+    val calorieGoal by vm.calorieGoal.collectAsState()
+    val veltoInstalled by vm.veltoInstalled.collectAsState()
+    val midasInstalled by vm.midasInstalled.collectAsState()
+    val syncVelto by vm.syncVelto.collectAsState()
+    val syncMidas by vm.syncMidas.collectAsState()
 
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     val listState = rememberLazyListState()
@@ -165,7 +177,9 @@ fun WorkoutScreen(vm: WorkoutViewModel, exVm: ExercisesViewModel) {
                     IconButton(onClick = { pickingDate = true }) { Icon(Icons.Default.CalendarMonth, "Pick a date") }
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Settings") }
-                        SettingsMenu(menu, { menu = false }, unit, vm::setUnit, dynamic, vm::setDynamicColor)
+                        SettingsMenu(menu, { menu = false }, unit, vm::setUnit, dynamic, vm::setDynamicColor) {
+                            menu = false; vm.refreshLinks(); goals = true
+                        }
                     }
                 },
                 scrollBehavior = scroll,
@@ -189,6 +203,19 @@ fun WorkoutScreen(vm: WorkoutViewModel, exVm: ExercisesViewModel) {
             item(key = "week") { WeekStrip(day, today, trained, vm::setDay) }
             item(key = "summary") {
                 DaySummary(groups, unit, streak, Modifier.padding(horizontal = 16.dp))
+            }
+            item(key = "daily") {
+                DailyRow(
+                    water = (daily["water"] ?: 0.0).toInt(),
+                    waterGoal = waterGoal,
+                    creatine = (daily["creatine"] ?: 0.0) >= 1.0,
+                    protein = food.sumOf { it.protein },
+                    proteinGoal = proteinGoal,
+                    onWater = vm::addWater,
+                    onCreatine = vm::setCreatine,
+                    onNutrition = { vm.refreshLinks(); nutrition = true },
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
             }
             if (groups.isEmpty()) {
                 item(key = "empty") {
@@ -221,6 +248,21 @@ fun WorkoutScreen(vm: WorkoutViewModel, exVm: ExercisesViewModel) {
         }
     }
 
+    if (nutrition) {
+        NutritionSheet(
+            food = food, proteinGoal = proteinGoal, calorieGoal = calorieGoal,
+            midasLinked = midasInstalled && syncMidas,
+            onAdd = vm::addFood, onDelete = vm::deleteFood, onAddToMidas = vm::addToMidas,
+            onDismiss = { nutrition = false },
+        )
+    }
+    if (goals) {
+        GoalsSheet(
+            waterGoal, proteinGoal, calorieGoal, vm::setWaterGoal, vm::setProteinGoal, vm::setCalorieGoal,
+            veltoInstalled, midasInstalled, syncVelto, syncMidas, vm::setSyncVelto, vm::setSyncMidas,
+            onDismiss = { goals = false },
+        )
+    }
     if (picking) {
         ExercisePicker(exVm, "Add exercises", onDismiss = { picking = false }) { ids ->
             picking = false
@@ -274,8 +316,10 @@ private fun dayTitle(d: LocalDate, today: LocalDate) = when (d) {
 }
 
 @Composable
-private fun SettingsMenu(open: Boolean, onClose: () -> Unit, unit: String, setUnit: (String) -> Unit, dynamic: Boolean, setDynamic: (Boolean) -> Unit) {
+private fun SettingsMenu(open: Boolean, onClose: () -> Unit, unit: String, setUnit: (String) -> Unit, dynamic: Boolean, setDynamic: (Boolean) -> Unit, onGoals: () -> Unit) {
     DropdownMenu(expanded = open, onDismissRequest = onClose) {
+        DropdownMenuItem(text = { Text("Goals & connected apps") }, leadingIcon = { Icon(Icons.Outlined.Tune, null) }, onClick = onGoals)
+        HorizontalDivider()
         Text("Weight unit", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         listOf("kg", "lb").forEach { u ->
             DropdownMenuItem(

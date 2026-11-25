@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- the other two ecosystem apps, so we can see and call them (Android 11+ package visibility) -->
+    <queries>
+        <package android:name="com.suks.velto" />
+        <package android:name="dev.suks.midas" />
+    </queries>
+
     <application
         android:name=".PupdrApp"
         android:allowBackup="true"
@@ -29,5 +35,10 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <!-- Velto calls this to sync habits; callers are checked against pinned signing certificates -->
+        <provider
+            android:name=".ecosystem.EcosystemProvider"
+            android:authorities="${applicationId}.ecosystem"
+            android:exported="true" />
     </application>
 </manifest>
