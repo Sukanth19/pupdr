@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- head -->
+    <path android:fillColor="#FFFFF4E6"
+        android:pathData="M54,30a18,18 0 1,1 0,36a18,18 0 1,1 0,-36z" />
+    <!-- floppy ears -->
+    <path android:fillColor="#FF7A3E22"
+        android:pathData="M39,35C30.5,35 26.5,45 28.5,55.5C29.5,61 35,62 36.8,56.5L41.5,40.5C42.2,37.5 41.5,35 39,35z" />
+    <path android:fillColor="#FF7A3E22"
+        android:pathData="M69,35C77.5,35 81.5,45 79.5,55.5C78.5,61 73,62 71.2,56.5L66.5,40.5C65.8,37.5 66.5,35 69,35z" />
+    <!-- forehead patch -->
+    <path android:fillColor="#FFF2C9A0"
+        android:pathData="M61,32.2C64.5,33.4 67,36.5 66,40C64.8,43.5 60.5,43 59.6,39.5C59,36.8 59.4,33.6 61,32.2z" />
+    <!-- snout -->
+    <path android:fillColor="#FFF7DCC0"
+        android:pathData="M45.5,56.5a8.5,6.5 0 1,0 17,0a8.5,6.5 0 1,0 -17,0z" />
+    <!-- eyes -->
+    <path android:fillColor="#FF1E1B2E"
+        android:pathData="M47,44a2.6,2.6 0 1,1 0,5.2a2.6,2.6 0 1,1 0,-5.2z" />
+    <path android:fillColor="#FF1E1B2E"
+        android:pathData="M61,44a2.6,2.6 0 1,1 0,5.2a2.6,2.6 0 1,1 0,-5.2z" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M47.9,44.6a0.9,0.9 0 1,1 0,1.8a0.9,0.9 0 1,1 0,-1.8z" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M61.9,44.6a0.9,0.9 0 1,1 0,1.8a0.9,0.9 0 1,1 0,-1.8z" />
+    <!-- nose -->
+    <path android:fillColor="#FF1E1B2E"
+        android:pathData="M50.4,52.3Q54,50.6 57.6,52.3Q56.6,56 54,56.6Q51.4,56 50.4,52.3z" />
+    <!-- dumbbell held in the mouth -->
+    <path android:fillColor="#FF1E1B2E"
+        android:pathData="M31,61.6h46v3.2h-46z" />
+    <path android:fillColor="#FF1E1B2E"
+        android:pathData="M27.5,56h3.5a1.5,1.5 0 0,1 1.5,1.5v11.4a1.5,1.5 0 0,1 -1.5,1.5h-3.5a1.5,1.5 0 0,1 -1.5,-1.5v-11.4a1.5,1.5 0 0,1 1.5,-1.5z" />
+    <path android:fillColor="#FF1E1B2E"
+        android:pathData="M77,56h3.5a1.5,1.5 0 0,1 1.5,1.5v11.4a1.5,1.5 0 0,1 -1.5,1.5h-3.5a1.5,1.5 0 0,1 -1.5,-1.5v-11.4a1.5,1.5 0 0,1 1.5,-1.5z" />
+    <path android:fillColor="#FF3B3655"
+        android:pathData="M33,58.5h3a1,1 0 0,1 1,1v7.4a1,1 0 0,1 -1,1h-3a1,1 0 0,1 -1,-1v-7.4a1,1 0 0,1 1,-1z" />
+    <path android:fillColor="#FF3B3655"
+        android:pathData="M72,58.5h3a1,1 0 0,1 1,1v7.4a1,1 0 0,1 -1,1h-3a1,1 0 0,1 -1,-1v-7.4a1,1 0 0,1 1,-1z" />
+    <!-- shine on plates -->
+    <path android:fillColor="#55FFFFFF"
+        android:pathData="M28,57.5h1v10.5h-1z" />
+    <path android:fillColor="#55FFFFFF"
+        android:pathData="M77.5,57.5h1v10.5h-1z" />
+</vector>
