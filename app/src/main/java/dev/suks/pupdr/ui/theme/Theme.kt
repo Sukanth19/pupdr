@@ -2,8 +2,10 @@ package dev.suks.pupdr.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Typography
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
+import dev.suks.pupdr.ui.suite.SuiteShapes
+import dev.suks.pupdr.ui.suite.SuiteTypography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -11,8 +13,6 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 
 // monochrome "ink" scheme: black and white with greys for depth (dynamic wallpaper colour is optional)
 private val Light = lightColorScheme(
@@ -85,17 +85,6 @@ private val Dark = darkColorScheme(
     inverseOnSurface = Color(0xFF111111),
 )
 
-private val Type = Typography().let {
-    it.copy(
-        displaySmall = it.displaySmall.copy(fontWeight = FontWeight.SemiBold),
-        headlineLarge = it.headlineLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp),
-        headlineMedium = it.headlineMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.25).sp),
-        headlineSmall = it.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
-        titleLarge = it.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-        titleMedium = it.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-    )
-}
-
 @Composable
 fun PupdrTheme(dynamic: Boolean = false, dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val scheme = when {
@@ -104,5 +93,12 @@ fun PupdrTheme(dynamic: Boolean = false, dark: Boolean = isSystemInDarkTheme(), 
         dark -> Dark
         else -> Light
     }
-    MaterialTheme(colorScheme = scheme, typography = Type, content = content)
+    // Velto's expressive theme: springy motion, rounder shapes, Plus Jakarta Sans
+    MaterialExpressiveTheme(
+        colorScheme = scheme,
+        motionScheme = MotionScheme.expressive(),
+        shapes = SuiteShapes,
+        typography = SuiteTypography,
+        content = content,
+    )
 }

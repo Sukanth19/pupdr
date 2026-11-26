@@ -135,6 +135,7 @@ fun WorkoutScreen(vm: WorkoutViewModel, exVm: ExercisesViewModel, onOpenFood: ()
     val trained by vm.trainedDays.collectAsState()
     val unit by vm.unit.collectAsState()
     val dynamic by vm.dynamicColor.collectAsState()
+    val themeMode by vm.themeMode.collectAsState()
     var picking by remember { mutableStateOf(false) }
     var choosingRoutine by remember { mutableStateOf(false) }
     var pickingDate by remember { mutableStateOf(false) }
@@ -178,7 +179,7 @@ fun WorkoutScreen(vm: WorkoutViewModel, exVm: ExercisesViewModel, onOpenFood: ()
                     IconButton(onClick = { pickingDate = true }) { Icon(Icons.Default.CalendarMonth, "Pick a date") }
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Settings") }
-                        SettingsMenu(menu, { menu = false }, unit, vm::setUnit, dynamic, vm::setDynamicColor) {
+                        SettingsMenu(menu, { menu = false }, unit, vm::setUnit, dynamic, vm::setDynamicColor, themeMode, vm::setThemeMode) {
                             menu = false; vm.refreshLinks(); goals = true
                         }
                     }
@@ -310,7 +311,10 @@ private fun dayTitle(d: LocalDate, today: LocalDate) = when (d) {
 }
 
 @Composable
-private fun SettingsMenu(open: Boolean, onClose: () -> Unit, unit: String, setUnit: (String) -> Unit, dynamic: Boolean, setDynamic: (Boolean) -> Unit, onGoals: () -> Unit) {
+private fun SettingsMenu(
+    open: Boolean, onClose: () -> Unit, unit: String, setUnit: (String) -> Unit, dynamic: Boolean, setDynamic: (Boolean) -> Unit,
+    themeMode: String, setThemeMode: (String) -> Unit, onGoals: () -> Unit,
+) {
     DropdownMenu(expanded = open, onDismissRequest = onClose) {
         DropdownMenuItem(text = { Text("Goals & connected apps") }, leadingIcon = { Icon(Icons.Outlined.Tune, null) }, onClick = onGoals)
         HorizontalDivider()
@@ -321,6 +325,11 @@ private fun SettingsMenu(open: Boolean, onClose: () -> Unit, unit: String, setUn
                 leadingIcon = { RadioButton(selected = unit == u, onClick = null) },
                 onClick = { setUnit(u) },
             )
+        }
+        HorizontalDivider()
+        Text("Theme", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        listOf("system" to "System", "light" to "Light", "dark" to "Dark").forEach { (m, label) ->
+            DropdownMenuItem(text = { Text(label) }, leadingIcon = { RadioButton(selected = themeMode == m, onClick = null) }, onClick = { setThemeMode(m) })
         }
         HorizontalDivider()
         DropdownMenuItem(

@@ -1,18 +1,16 @@
 package dev.suks.pupdr
 
 import android.os.Bundle
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.navigation.NavBackStackEntry
+import dev.suks.pupdr.ui.suite.NavBarItem
+import dev.suks.pupdr.ui.suite.SuiteNavBar
+import dev.suks.pupdr.ui.suite.SuiteTransitions
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,15 +27,11 @@ import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Today
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -81,7 +75,9 @@ class MainActivity : ComponentActivity() {
         val app = application as PupdrApp
         setContent {
             val dynamic by app.prefs.dynamicColor.collectAsState()
-            PupdrTheme(dynamic = dynamic) {
+            val mode by app.prefs.themeMode.collectAsState()
+            val dark = when (mode) { "light" -> false; "dark" -> true; else -> isSystemInDarkTheme() }
+            PupdrTheme(dynamic = dynamic, dark = dark) {
                 val ready by app.ready.collectAsState()
                 Surface(color = MaterialTheme.colorScheme.surface) {
                     Crossfade(ready, animationSpec = Motion.standard(Motion.LONG), label = "boot") { isReady ->
@@ -132,22 +128,18 @@ private fun PupdrRoot(app: PupdrApp) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
-            AnimatedVisibility(
-                visible = onTab,
-                enter = slideInVertically(Motion.enter()) { it } + fadeIn(Motion.enter()),
-                exit = slideOutVertically(Motion.exit()) { it } + fadeOut(Motion.exit()),
-            ) {
-                NavigationBar {
-                    Tab.entries.forEach { t ->
-                        val selected = destination?.hierarchy?.any { it.route == t.route } == true
-                        NavigationBarItem(
-                            selected = selected,
+            if (onTab) {
+                SuiteNavBar(
+                    Tab.entries.map { t ->
+                        NavBarItem(
+                            label = t.label,
+                            icon = t.icon,
+                            selectedIcon = t.selectedIcon,
+                            selected = destination?.hierarchy?.any { it.route == t.route } == true,
                             onClick = { goTab(t.route) },
-                            icon = { Icon(if (selected) t.selectedIcon else t.icon, null) },
-                            label = { Text(t.label) },
                         )
                     }
-                }
+                )
             }
         },
     ) { pad ->
@@ -155,11 +147,10 @@ private fun PupdrRoot(app: PupdrApp) {
             navController = nav,
             startDestination = Tab.Workout.route,
             modifier = Modifier.padding(pad).consumeWindowInsets(pad).imePadding(),
-            // tabs: Material "fade through"
-            enterTransition = { fadeIn(Motion.enter(Motion.MEDIUM, delay = 60)) + scaleIn(Motion.enter(Motion.MEDIUM, delay = 60), initialScale = 0.94f) },
-            exitTransition = { fadeOut(Motion.exit(90)) },
-            popEnterTransition = { fadeIn(Motion.enter(Motion.MEDIUM, delay = 60)) + scaleIn(Motion.enter(Motion.MEDIUM, delay = 60), initialScale = 0.94f) },
-            popExitTransition = { fadeOut(Motion.exit(90)) },
+            enterTransition = { if (isTabSwitch()) SuiteTransitions.tabEnter else SuiteTransitions.pushEnter },
+            exitTransition = { if (isTabSwitch()) SuiteTransitions.tabExit else SuiteTransitions.pushExit },
+            popEnterTransition = { if (isTabSwitch()) SuiteTransitions.tabEnter else SuiteTransitions.popEnter },
+            popExitTransition = { if (isTabSwitch()) SuiteTransitions.tabExit else SuiteTransitions.popExit },
         ) {
             composable(Tab.Workout.route) {
                 WorkoutScreen(workoutVm, exercisesVm, onOpenFood = {
@@ -189,10 +180,6 @@ private fun PupdrRoot(app: PupdrApp) {
                     navArgument("id") { type = NavType.LongType },
                     navArgument("new") { type = NavType.BoolType; defaultValue = false },
                 ),
-                // detail: Material "shared axis X"
-                enterTransition = { slideInHorizontally(Motion.enter(Motion.LONG)) { it / 5 } + fadeIn(Motion.enter(Motion.MEDIUM)) },
-                exitTransition = { slideOutHorizontally(Motion.exit(Motion.MEDIUM)) { it / 5 } + fadeOut(Motion.exit()) },
-                popExitTransition = { slideOutHorizontally(Motion.exit(Motion.MEDIUM)) { it / 5 } + fadeOut(Motion.exit()) },
             ) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
                 val vm: RoutineDetailViewModel = viewModel(key = "routine-$id") { RoutineDetailViewModel(app, id) }
@@ -204,3 +191,8 @@ private fun PupdrRoot(app: PupdrApp) {
         }
     }
 }
+
+private val tabRoutes = Tab.entries.map { it.route }.toSet()
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.isTabSwitch(): Boolean =
+    initialState.destination.route in tabRoutes && targetState.destination.route in tabRoutes

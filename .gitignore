@@ -8,3 +8,5 @@ build/
 captures/
 *.apk
 *.keystore
+keystore.properties
+*.jks

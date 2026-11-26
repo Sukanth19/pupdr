@@ -8,6 +8,11 @@ class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("pupdr", Context.MODE_PRIVATE)
     private val _unit = MutableStateFlow(sp.getString("unit", "kg") ?: "kg")
     val unit: StateFlow<String> = _unit
+    private val _themeMode = MutableStateFlow(sp.getString("theme_mode", "system") ?: "system")
+    /** "system", "light" or "dark". */
+    val themeMode: StateFlow<String> = _themeMode
+    fun setThemeMode(m: String) { sp.edit().putString("theme_mode", m).apply(); _themeMode.value = m }
+
     private val _dynamic = MutableStateFlow(sp.getBoolean("dynamic_color_v2", false))
     val dynamicColor: StateFlow<Boolean> = _dynamic
 

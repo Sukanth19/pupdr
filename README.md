@@ -27,6 +27,7 @@ A Kotlin / Jetpack Compose Android app for tracking daily gym workouts. The name
   - **[Velto](https://github.com/Sukanth19/velto)**: creatine, water and workouts tick off as habits in both apps. Tick one in either app and the other follows.
   - **[Midas](https://github.com/Sukanth19/midas)**: send creatine or whey to your Midas buy list when you're running low, and see what you've spent on the gym and supplements in your reports.
   - The three apps talk only to each other, checked by package name and pinned signing certificate in both directions (`ecosystem/Ecosystem.kt`). Each can be turned off under ⋮ → Goals & connected apps.
+- **Same feel as Velto and Midas**: Velto's floating pill navigation bar, its transitions, the Material 3 expressive theme and Plus Jakarta Sans (SIL OFL, see `third_party/`). Each app keeps its own default colours (pupdr black, Midas gold, Velto pink), and all three can switch to wallpaper colours.
 - **Material 3, in black and white**: a monochrome ink theme (true black in dark mode), with optional Material You wallpaper colours in the ⋮ menu. Large collapsing app bars, a swipeable week strip, swipe-to-delete sets, A–Z library headers, and bottom-sheet menus.
 - **Motion** follows Material's emphasized easing: fade-through between tabs, shared-axis for detail screens, animated list insert/remove/reorder, rolling numbers, growing charts, and FABs that collapse on scroll.
 - kg / lb, light and dark themes, and an adaptive launcher icon that supports Android 13+ themed icons.

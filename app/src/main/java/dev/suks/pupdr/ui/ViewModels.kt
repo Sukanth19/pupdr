@@ -101,6 +101,9 @@ class WorkoutViewModel(private val app: PupdrApp, private val messages: Messages
     fun setSyncVelto(on: Boolean) = app.prefs.setSyncVelto(on)
     fun setSyncMidas(on: Boolean) = app.prefs.setSyncMidas(on)
 
+    val themeMode = app.prefs.themeMode
+    fun setThemeMode(m: String) = app.prefs.setThemeMode(m)
+
     fun setDay(d: LocalDate) { day.value = d }
     fun setUnit(u: String) = app.prefs.setUnit(u)
     fun setDynamicColor(on: Boolean) = app.prefs.setDynamicColor(on)
