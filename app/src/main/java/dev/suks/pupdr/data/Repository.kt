@@ -6,6 +6,7 @@ import dev.suks.pupdr.domain.RoutineCodec
 import dev.suks.pupdr.domain.RoutineDto
 import dev.suks.pupdr.domain.RoutineItemDto
 import kotlinx.coroutines.Dispatchers
+import dev.suks.pupdr.domain.Macros
 import dev.suks.pupdr.ecosystem.Ecosystem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -225,7 +226,11 @@ class Repository(private val db: PupdrDatabase) {
         }
     }
 
-    suspend fun addFood(day: Long, name: String, protein: Double, calories: Int) =
-        dailyDao.addFood(FoodEntry(epochDay = day, name = name.trim().ifEmpty { "Food" }, protein = protein.coerceAtLeast(0.0), calories = calories.coerceAtLeast(0)))
+    /** Logs a food. If [calories] is 0, it's worked out from the macros (4 / 4 / 9 kcal per gram). */
+    suspend fun addFood(day: Long, name: String, protein: Double, carbs: Double, fat: Double, calories: Int, meal: Meal) {
+        val p = protein.coerceAtLeast(0.0); val c = carbs.coerceAtLeast(0.0); val f = fat.coerceAtLeast(0.0)
+        val kcal = if (calories > 0) calories else Macros.kcal(p, c, f).toInt()
+        dailyDao.addFood(FoodEntry(epochDay = day, name = name.trim().ifEmpty { "Food" }, protein = p, carbs = c, fat = f, calories = kcal, meal = meal.ordinal))
+    }
     suspend fun deleteFood(id: Long) = dailyDao.deleteFood(id)
 }

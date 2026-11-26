@@ -2,18 +2,15 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <group android:pivotX="55.5" android:pivotY="54.5" android:scaleX="0.8" android:scaleY="0.8" android:translateX="-1.5" android:translateY="-0.5">
-    <!-- dumbbell -->
-    <path android:fillColor="#FF000000"
-        android:pathData="M29.5,55h3a2,2 0 0,1 2,2v18a2,2 0 0,1 -2,2h-3a2,2 0 0,1 -2,-2v-18a2,2 0 0,1 2,-2z M36.5,59h1.5a2,2 0 0,1 2,2v10a2,2 0 0,1 -2,2h-1.5a2,2 0 0,1 -2,-2v-10a2,2 0 0,1 2,-2z M52,59h1.5a2,2 0 0,1 2,2v10a2,2 0 0,1 -2,2h-1.5a2,2 0 0,1 -2,-2v-10a2,2 0 0,1 2,-2z M57.5,55h3a2,2 0 0,1 2,2v18a2,2 0 0,1 -2,2h-3a2,2 0 0,1 -2,-2v-18a2,2 0 0,1 2,-2z" />
-    <path android:strokeColor="#FF000000" android:strokeWidth="4" android:strokeLineCap="round"
-        android:pathData="M40,66H50" />
-    <!-- protein shaker -->
-    <path android:strokeColor="#FF000000" android:strokeWidth="3.5" android:strokeLineJoin="round"
-        android:pathData="M67.5,45.5H80.5L79,75a2,2 0 0,1 -2,2H71a2,2 0 0,1 -2,-2Z" />
-    <path android:fillColor="#FF000000"
-        android:pathData="M66,38.5h16a1.5,1.5 0 0,1 1.5,1.5v4a1.5,1.5 0 0,1 -1.5,1.5h-16a1.5,1.5 0 0,1 -1.5,-1.5v-4a1.5,1.5 0 0,1 1.5,-1.5z M71,32h6a1,1 0 0,1 1,1v5.5h-8v-5.5a1,1 0 0,1 1,-1z" />
-    <path android:strokeColor="#FF000000" android:strokeWidth="2.5" android:strokeLineCap="round"
-        android:pathData="M70.5,57H75.5M70.5,63H74" />
+    <!-- a single bold dumbbell, tilted -->
+    <group android:pivotX="54" android:pivotY="54" android:rotation="-35">
+        <!-- handle -->
+        <path android:fillColor="#FF000000" android:pathData="M42,51.5h24v5h-24z" />
+        <!-- inner plates -->
+        <path android:fillColor="#FF000000" android:pathData="M37,40h4a2.5,2.5 0 0,1 2.5,2.5v23a2.5,2.5 0 0,1 -2.5,2.5h-4a2.5,2.5 0 0,1 -2.5,-2.5v-23a2.5,2.5 0 0,1 2.5,-2.5z" />
+        <path android:fillColor="#FF000000" android:pathData="M67,40h4a2.5,2.5 0 0,1 2.5,2.5v23a2.5,2.5 0 0,1 -2.5,2.5h-4a2.5,2.5 0 0,1 -2.5,-2.5v-23a2.5,2.5 0 0,1 2.5,-2.5z" />
+        <!-- outer plates -->
+        <path android:fillColor="#FF000000" android:pathData="M28,44.5h3a2,2 0 0,1 2,2v15a2,2 0 0,1 -2,2h-3a2,2 0 0,1 -2,-2v-15a2,2 0 0,1 2,-2z" />
+        <path android:fillColor="#FF000000" android:pathData="M77,44.5h3a2,2 0 0,1 2,2v15a2,2 0 0,1 -2,2h-3a2,2 0 0,1 -2,-2v-15a2,2 0 0,1 2,-2z" />
     </group>
 </vector>

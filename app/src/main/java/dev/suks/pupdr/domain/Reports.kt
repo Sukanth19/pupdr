@@ -182,27 +182,32 @@ data class DailyStats(
     val foodDays: Int,
     val avgProtein: Double,
     val avgCalories: Double,
+    val avgCarbs: Double = 0.0,
+    val avgFat: Double = 0.0,
 ) {
     val isEmpty get() = creatineDays == 0 && waterGoalDays == 0 && avgWater == 0.0 && foodDays == 0
 
     companion object {
-        /** [logs] are (epochDay, key, value); [food] are (epochDay, protein, calories). Averages are over days with entries. */
+        /** [logs] are (epochDay, key, value). Food averages are over days with something logged. */
         fun build(
             range: DateRange,
             logs: List<Triple<Long, String, Double>>,
-            food: List<Triple<Long, Double, Int>>,
+            food: List<dev.suks.pupdr.data.FoodEntry>,
             waterGoal: Int,
         ): DailyStats {
             val water = logs.filter { it.second == "water" && it.third > 0 }
-            val byDay = food.groupBy { it.first }
+            val byDay = food.groupBy { it.epochDay }
+            fun avg(f: (dev.suks.pupdr.data.FoodEntry) -> Double) = if (byDay.isEmpty()) 0.0 else byDay.values.sumOf { d -> d.sumOf(f) } / byDay.size
             return DailyStats(
                 days = range.days,
                 creatineDays = logs.count { it.second == "creatine" && it.third >= 1 },
                 waterGoalDays = water.count { it.third >= waterGoal },
                 avgWater = if (water.isEmpty()) 0.0 else water.sumOf { it.third } / water.size,
                 foodDays = byDay.size,
-                avgProtein = if (byDay.isEmpty()) 0.0 else byDay.values.sumOf { d -> d.sumOf { it.second } } / byDay.size,
-                avgCalories = if (byDay.isEmpty()) 0.0 else byDay.values.sumOf { d -> d.sumOf { it.third }.toDouble() } / byDay.size,
+                avgProtein = avg { it.protein },
+                avgCalories = avg { it.calories.toDouble() },
+                avgCarbs = avg { it.carbs },
+                avgFat = avg { it.fat },
             )
         }
     }
@@ -214,6 +219,8 @@ fun DailyStats.toText(): String = buildString {
     appendLine("  Water goal   : $waterGoalDays of $days days (avg ${ReportBuilder.fmt(avgWater)} glasses)")
     if (foodDays > 0) {
         appendLine("  Protein      : ${ReportBuilder.fmt(avgProtein)} g/day avg ($foodDays days logged)")
+        appendLine("  Carbs        : ${ReportBuilder.fmt(avgCarbs)} g/day avg")
+        appendLine("  Fat          : ${ReportBuilder.fmt(avgFat)} g/day avg")
         appendLine("  Calories     : ${ReportBuilder.fmt(avgCalories)} kcal/day avg")
     }
 }

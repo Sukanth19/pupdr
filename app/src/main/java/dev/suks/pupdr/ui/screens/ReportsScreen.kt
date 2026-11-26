@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -381,9 +382,18 @@ private fun HabitsCard(d: DailyStats?, spend: Spend?) {
                         Text("${ReportBuilder.fmt(d.avgProtein)} g/day", style = MaterialTheme.typography.titleSmall)
                     }
                     Row {
+                        Text("Carbs", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text("${ReportBuilder.fmt(d.avgCarbs)} g/day", style = MaterialTheme.typography.titleSmall)
+                    }
+                    Row {
+                        Text("Fat", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text("${ReportBuilder.fmt(d.avgFat)} g/day", style = MaterialTheme.typography.titleSmall)
+                    }
+                    Row {
                         Text("Calories", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         Text("${ReportBuilder.fmt(d.avgCalories)} kcal/day", style = MaterialTheme.typography.titleSmall)
                     }
+                    MacroSplit(d.avgProtein, d.avgCarbs, d.avgFat)
                 }
             }
             if (spend != null) {
@@ -410,6 +420,30 @@ private fun HabitLine(label: String, value: String, fraction: Float) {
         Spacer(Modifier.height(6.dp))
         Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
             Box(Modifier.fillMaxWidth(p).height(8.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.primary))
+        }
+    }
+}
+
+/** Average share of calories from each macro, as one segmented bar with a labelled legend. */
+@Composable
+private fun MacroSplit(protein: Double, carbs: Double, fat: Double) {
+    val colors = macroColors()
+    val (p, c, f) = dev.suks.pupdr.domain.Macros(protein, carbs, fat).calorieSplit()
+    if (p + c + f <= 0f) return
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().height(12.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            listOf(p to colors.protein, c to colors.carbs, f to colors.fat).filter { it.first > 0f }.forEach { (share, col) ->
+                Box(Modifier.weight(share).fillMaxSize().clip(RoundedCornerShape(4.dp)).background(col))
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            listOf(Triple("Protein", p, colors.protein), Triple("Carbs", c, colors.carbs), Triple("Fat", f, colors.fat)).forEach { (l, share, col) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(10.dp).clip(RoundedCornerShape(3.dp)).background(col))
+                    Spacer(Modifier.width(6.dp))
+                    Text("$l ${(share * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+                }
+            }
         }
     }
 }

@@ -6,6 +6,9 @@ import dev.suks.pupdr.PupdrApp
 import dev.suks.pupdr.data.Exercise
 import dev.suks.pupdr.data.SetWithExercise
 import dev.suks.pupdr.data.FoodEntry
+import dev.suks.pupdr.data.Meal
+import dev.suks.pupdr.domain.Macros
+import dev.suks.pupdr.domain.dailyMacros
 import dev.suks.pupdr.domain.DailyStats
 import dev.suks.pupdr.domain.DateRange
 import dev.suks.pupdr.ecosystem.Spend
@@ -88,18 +91,15 @@ class WorkoutViewModel(private val app: PupdrApp, private val messages: Messages
 
     fun addWater(delta: Int) = viewModelScope.launch { repo.addWater(day.value.toEpochDay(), delta) }
     fun setCreatine(taken: Boolean) = viewModelScope.launch { repo.setCreatine(day.value.toEpochDay(), taken) }
-    fun addFood(name: String, protein: Double, calories: Int) = viewModelScope.launch { repo.addFood(day.value.toEpochDay(), name, protein, calories) }
-    fun deleteFood(id: Long) = viewModelScope.launch { repo.deleteFood(id) }
     fun setWaterGoal(v: Int) = app.prefs.setWaterGoal(v)
     fun setProteinGoal(v: Int) = app.prefs.setProteinGoal(v)
     fun setCalorieGoal(v: Int) = app.prefs.setCalorieGoal(v)
+    val carbGoal = app.prefs.carbGoal
+    val fatGoal = app.prefs.fatGoal
+    fun setCarbGoal(v: Int) = app.prefs.setCarbGoal(v)
+    fun setFatGoal(v: Int) = app.prefs.setFatGoal(v)
     fun setSyncVelto(on: Boolean) = app.prefs.setSyncVelto(on)
     fun setSyncMidas(on: Boolean) = app.prefs.setSyncMidas(on)
-
-    fun addToMidas(item: String) = viewModelScope.launch {
-        if (app.bridge.addToMidasBuyList(item)) messages.send("Added $item to your Midas buy list")
-        else messages.send("Couldn't reach Midas")
-    }
 
     fun setDay(d: LocalDate) { day.value = d }
     fun setUnit(u: String) = app.prefs.setUnit(u)
@@ -114,6 +114,39 @@ class WorkoutViewModel(private val app: PupdrApp, private val messages: Messages
     fun updateSet(id: Long, reps: Int, weight: Double, done: Boolean) = viewModelScope.launch { repo.updateSet(id, reps, weight, done) }
     fun deleteSet(id: Long) = viewModelScope.launch { repo.deleteSet(id) }
     fun removeExercise(exerciseId: String) = viewModelScope.launch { repo.removeExerciseFromDay(day.value.toEpochDay(), exerciseId) }
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class FoodViewModel(private val app: PupdrApp, private val messages: Messages) : ViewModel() {
+    private val repo = app.repo
+    val day = MutableStateFlow(LocalDate.now())
+    val entries: StateFlow<List<FoodEntry>> = day.flatMapLatest { repo.foodFor(it.toEpochDay()) }.state(this, emptyList())
+    /** The 7 days ending on the selected day, for the weekly chart. */
+    val week: StateFlow<List<Pair<LocalDate, Macros>>> = day.flatMapLatest { d ->
+        repo.foodBetween(d.minusDays(6).toEpochDay(), d.toEpochDay()).map { dailyMacros(it, d) }
+    }.state(this, emptyList())
+    val proteinGoal = app.prefs.proteinGoal
+    val carbGoal = app.prefs.carbGoal
+    val fatGoal = app.prefs.fatGoal
+    val calorieGoal = app.prefs.calorieGoal
+    val midasLinked = MutableStateFlow(false)
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) { midasLinked.value = app.bridge.midasInstalled() && app.prefs.syncMidas.value }
+    }
+
+    fun setDay(d: LocalDate) { day.value = d }
+    fun shiftDay(delta: Long) { day.value = day.value.plusDays(delta) }
+
+    fun add(name: String, macros: Macros, meal: Meal) = viewModelScope.launch {
+        repo.addFood(day.value.toEpochDay(), name, macros.protein, macros.carbs, macros.fat, macros.calories.toInt(), meal)
+    }
+    fun delete(id: Long) = viewModelScope.launch { repo.deleteFood(id) }
+
+    fun addToMidas(item: String) = viewModelScope.launch {
+        if (app.bridge.addToMidasBuyList(item)) messages.send("Added $item to your Midas buy list")
+        else messages.send("Couldn't reach Midas")
+    }
 }
 
 class ExercisesViewModel(private val app: PupdrApp, private val messages: Messages) : ViewModel() {
@@ -223,7 +256,7 @@ class ReportsViewModel(private val app: PupdrApp) : ViewModel() {
     val daily: StateFlow<DailyStats?> = combine(range, app.prefs.waterGoal) { r, g -> r to g }
         .flatMapLatest { (r, goal) ->
             combine(repo.dailyBetween(r.from.toEpochDay(), r.to.toEpochDay()), repo.foodBetween(r.from.toEpochDay(), r.to.toEpochDay())) { logs, food ->
-                DailyStats.build(r, logs.map { Triple(it.epochDay, it.key, it.value) }, food.map { Triple(it.epochDay, it.protein, it.calories) }, goal)
+                DailyStats.build(r, logs.map { Triple(it.epochDay, it.key, it.value) }, food, goal)
             }
         }.state(this, null)
 

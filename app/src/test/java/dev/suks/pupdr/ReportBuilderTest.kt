@@ -62,7 +62,8 @@ class ReportBuilderTest {
             Triple(d.toEpochDay(), "creatine", 1.0), Triple(d.minusDays(1).toEpochDay(), "creatine", 1.0),
             Triple(d.toEpochDay(), "water", 8.0), Triple(d.minusDays(2).toEpochDay(), "water", 4.0),
         )
-        val food = listOf(Triple(d.toEpochDay(), 100.0, 1500), Triple(d.toEpochDay(), 40.0, 500), Triple(d.minusDays(1).toEpochDay(), 120.0, 2000))
+        fun fe(day: LocalDate, p: Double, c: Double, f: Double, k: Int) = dev.suks.pupdr.data.FoodEntry(epochDay = day.toEpochDay(), name = "x", protein = p, carbs = c, fat = f, calories = k)
+        val food = listOf(fe(d, 100.0, 150.0, 40.0, 1500), fe(d, 40.0, 50.0, 20.0, 500), fe(d.minusDays(1), 120.0, 300.0, 60.0, 2000))
         val s = dev.suks.pupdr.domain.DailyStats.build(r, logs, food, waterGoal = 8)
         assertEquals(2, s.creatineDays)
         assertEquals(1, s.waterGoalDays)
@@ -70,5 +71,21 @@ class ReportBuilderTest {
         assertEquals(2, s.foodDays)
         assertEquals(130.0, s.avgProtein, 0.001)
         assertEquals(2000.0, s.avgCalories, 0.001)
+        assertEquals(250.0, s.avgCarbs, 0.001)
+        assertEquals(60.0, s.avgFat, 0.001)
+    }
+
+    @Test fun macros() {
+        val m = dev.suks.pupdr.domain.Macros(protein = 25.0, carbs = 50.0, fat = 10.0)
+        assertEquals(390.0, dev.suks.pupdr.domain.Macros.kcal(25.0, 50.0, 10.0), 0.0)
+        val (p, c, f) = m.calorieSplit()
+        assertEquals(100f / 390f, p, 0.0001f); assertEquals(200f / 390f, c, 0.0001f); assertEquals(90f / 390f, f, 0.0001f)
+        val week = dev.suks.pupdr.domain.dailyMacros(
+            listOf(dev.suks.pupdr.data.FoodEntry(epochDay = d.toEpochDay(), name = "x", protein = 10.0, calories = 100)), d,
+        )
+        assertEquals(7, week.size)
+        assertEquals(d, week.last().first)
+        assertEquals(10.0, week.last().second.protein, 0.0)
+        assertEquals(0.0, week.first().second.protein, 0.0)
     }
 }

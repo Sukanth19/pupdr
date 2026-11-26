@@ -127,7 +127,7 @@ private const val CURRENT_WEEK_PAGE = 1100
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WorkoutScreen(vm: WorkoutViewModel, exVm: ExercisesViewModel) {
+fun WorkoutScreen(vm: WorkoutViewModel, exVm: ExercisesViewModel, onOpenFood: () -> Unit) {
     val day by vm.day.collectAsState()
     val groups by vm.groups.collectAsState()
     val routines by vm.routines.collectAsState()
@@ -139,13 +139,14 @@ fun WorkoutScreen(vm: WorkoutViewModel, exVm: ExercisesViewModel) {
     var choosingRoutine by remember { mutableStateOf(false) }
     var pickingDate by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
-    var nutrition by remember { mutableStateOf(false) }
     var goals by remember { mutableStateOf(false) }
     val daily by vm.daily.collectAsState()
     val food by vm.food.collectAsState()
     val waterGoal by vm.waterGoal.collectAsState()
     val proteinGoal by vm.proteinGoal.collectAsState()
     val calorieGoal by vm.calorieGoal.collectAsState()
+    val carbGoal by vm.carbGoal.collectAsState()
+    val fatGoal by vm.fatGoal.collectAsState()
     val veltoInstalled by vm.veltoInstalled.collectAsState()
     val midasInstalled by vm.midasInstalled.collectAsState()
     val syncVelto by vm.syncVelto.collectAsState()
@@ -213,7 +214,7 @@ fun WorkoutScreen(vm: WorkoutViewModel, exVm: ExercisesViewModel) {
                     proteinGoal = proteinGoal,
                     onWater = vm::addWater,
                     onCreatine = vm::setCreatine,
-                    onNutrition = { vm.refreshLinks(); nutrition = true },
+                    onNutrition = onOpenFood,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
@@ -248,17 +249,10 @@ fun WorkoutScreen(vm: WorkoutViewModel, exVm: ExercisesViewModel) {
         }
     }
 
-    if (nutrition) {
-        NutritionSheet(
-            food = food, proteinGoal = proteinGoal, calorieGoal = calorieGoal,
-            midasLinked = midasInstalled && syncMidas,
-            onAdd = vm::addFood, onDelete = vm::deleteFood, onAddToMidas = vm::addToMidas,
-            onDismiss = { nutrition = false },
-        )
-    }
     if (goals) {
         GoalsSheet(
-            waterGoal, proteinGoal, calorieGoal, vm::setWaterGoal, vm::setProteinGoal, vm::setCalorieGoal,
+            waterGoal, proteinGoal, carbGoal, fatGoal, calorieGoal,
+            vm::setWaterGoal, vm::setProteinGoal, vm::setCarbGoal, vm::setFatGoal, vm::setCalorieGoal,
             veltoInstalled, midasInstalled, syncVelto, syncMidas, vm::setSyncVelto, vm::setSyncMidas,
             onDismiss = { goals = false },
         )

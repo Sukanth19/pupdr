@@ -141,7 +141,10 @@ class RepositoryTest {
         repo.deleteSet(set.id)
         assertEquals(Triple("workout", day, false), events.last())
 
-        repo.addFood(day, "Protein shake", 25.0, 120)
-        assertEquals(25.0, repo.foodFor(day).first().single().protein, 0.0)
+        repo.addFood(day, "Protein shake", 25.0, 3.0, 1.5, 0, dev.suks.pupdr.data.Meal.BREAKFAST)
+        val shake = repo.foodFor(day).first().single()
+        assertEquals(25.0, shake.protein, 0.0)
+        assertEquals(125, shake.calories) // 25*4 + 3*4 + 1.5*9, worked out from macros
+        assertEquals(dev.suks.pupdr.data.Meal.BREAKFAST.ordinal, shake.meal)
     }
 }

@@ -69,19 +69,6 @@ import dev.suks.pupdr.domain.ReportBuilder
 import dev.suks.pupdr.ui.components.AnimatedNumber
 import dev.suks.pupdr.ui.theme.Motion
 
-/** Quick-add foods: name, protein g, kcal. */
-private val PRESETS = listOf(
-    Triple("Protein shake", 25.0, 120),
-    Triple("2 eggs", 12.0, 140),
-    Triple("Chicken breast 100g", 31.0, 165),
-    Triple("Greek yogurt", 17.0, 100),
-    Triple("Paneer 100g", 18.0, 265),
-    Triple("Dal, 1 bowl", 9.0, 180),
-    Triple("Rice, 1 cup", 4.0, 205),
-    Triple("Oats 50g", 7.0, 190),
-    Triple("Banana", 1.0, 105),
-)
-
 @Composable
 fun DailyRow(
     water: Int,
@@ -178,108 +165,11 @@ private fun CreatineTile(taken: Boolean, onChange: (Boolean) -> Unit, modifier: 
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
-@Composable
-fun NutritionSheet(
-    food: List<FoodEntry>,
-    proteinGoal: Int,
-    calorieGoal: Int,
-    midasLinked: Boolean,
-    onAdd: (String, Double, Int) -> Unit,
-    onDelete: (Long) -> Unit,
-    onAddToMidas: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var name by remember { mutableStateOf("") }
-    var protein by remember { mutableStateOf("") }
-    var kcal by remember { mutableStateOf("") }
-    val totalP = food.sumOf { it.protein }
-    val totalK = food.sumOf { it.calories }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 24.dp).imePadding().verticalScroll(rememberScrollState()).animateContentSize(Motion.sizeSpring)) {
-            Text("Nutrition", style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(16.dp))
-            GoalBar("Protein", "${ReportBuilder.fmt(totalP)} / $proteinGoal g", (totalP / proteinGoal).toFloat())
-            Spacer(Modifier.height(12.dp))
-            GoalBar("Calories", "$totalK / $calorieGoal kcal", totalK.toFloat() / calorieGoal)
-            Spacer(Modifier.height(24.dp))
-            Text("Quick add", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PRESETS.forEach { (n, p, k) ->
-                    AssistChip(onClick = { onAdd(n, p, k) }, label = { Text("$n · ${ReportBuilder.fmt(p)}g") })
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            Text("Something else", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(name, { name = it }, label = { Text("Food") }, singleLine = true, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(protein, { protein = it.filter { c -> c.isDigit() || c == '.' }.take(5) }, label = { Text("Protein g") }, singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), shape = RoundedCornerShape(16.dp), modifier = Modifier.weight(1f))
-                OutlinedTextField(kcal, { kcal = it.filter(Char::isDigit).take(5) }, label = { Text("kcal") }, singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(16.dp), modifier = Modifier.weight(1f))
-                FilledTonalIconButton(
-                    onClick = {
-                        onAdd(name, protein.toDoubleOrNull() ?: 0.0, kcal.toIntOrNull() ?: 0)
-                        name = ""; protein = ""; kcal = ""
-                    },
-                    enabled = name.isNotBlank() || protein.isNotBlank() || kcal.isNotBlank(),
-                ) { Icon(Icons.Default.Add, "Add food") }
-            }
-            if (food.isNotEmpty()) {
-                Spacer(Modifier.height(20.dp))
-                Text("Today", style = MaterialTheme.typography.titleMedium)
-                food.forEach { f ->
-                    ListItem(
-                        headlineContent = { Text(f.name) },
-                        supportingContent = { Text("${ReportBuilder.fmt(f.protein)} g protein · ${f.calories} kcal") },
-                        trailingContent = { IconButton(onClick = { onDelete(f.id) }) { Icon(Icons.Default.Close, "Remove") } },
-                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                    )
-                }
-            }
-            if (midasLinked) {
-                Spacer(Modifier.height(20.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(16.dp))
-                Text("Running low?", style = MaterialTheme.typography.titleMedium)
-                Text("Adds it to your Midas buy list.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("Creatine", "Whey protein").forEach { item ->
-                        AssistChip(onClick = { onAddToMidas(item) }, label = { Text(item) }, leadingIcon = { Icon(Icons.Outlined.AddShoppingCart, null, Modifier.size(18.dp)) })
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun GoalBar(label: String, value: String, fraction: Float) {
-    val p by animateFloatAsState(fraction.coerceIn(0f, 1f), Motion.standard(Motion.LONG), label = "goal-$label")
-    Row(Modifier.fillMaxWidth()) {
-        Text(label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    Spacer(Modifier.height(6.dp))
-    LinearProgressIndicator(
-        progress = { p },
-        modifier = Modifier.fillMaxWidth().height(8.dp),
-        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-        strokeCap = StrokeCap.Round,
-        gapSize = 0.dp,
-        drawStopIndicator = {},
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalsSheet(
-    waterGoal: Int, proteinGoal: Int, calorieGoal: Int,
-    setWater: (Int) -> Unit, setProtein: (Int) -> Unit, setCalories: (Int) -> Unit,
+    waterGoal: Int, proteinGoal: Int, carbGoal: Int, fatGoal: Int, calorieGoal: Int,
+    setWater: (Int) -> Unit, setProtein: (Int) -> Unit, setCarbs: (Int) -> Unit, setFat: (Int) -> Unit, setCalories: (Int) -> Unit,
     veltoInstalled: Boolean, midasInstalled: Boolean,
     syncVelto: Boolean, syncMidas: Boolean,
     setSyncVelto: (Boolean) -> Unit, setSyncMidas: (Boolean) -> Unit,
@@ -291,6 +181,8 @@ fun GoalsSheet(
             Spacer(Modifier.height(12.dp))
             Stepper("Water", "$waterGoal glasses", { setWater(waterGoal - 1) }, { setWater(waterGoal + 1) })
             Stepper("Protein", "$proteinGoal g", { setProtein(proteinGoal - 5) }, { setProtein(proteinGoal + 5) })
+            Stepper("Carbs", "$carbGoal g", { setCarbs(carbGoal - 10) }, { setCarbs(carbGoal + 10) })
+            Stepper("Fat", "$fatGoal g", { setFat(fatGoal - 5) }, { setFat(fatGoal + 5) })
             Stepper("Calories", "$calorieGoal kcal", { setCalories(calorieGoal - 50) }, { setCalories(calorieGoal + 50) })
             Spacer(Modifier.height(24.dp))
             Text("Connected apps", style = MaterialTheme.typography.headlineSmall)

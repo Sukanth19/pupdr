@@ -23,6 +23,8 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Insights
@@ -55,6 +57,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import dev.suks.pupdr.ui.ExercisesViewModel
+import dev.suks.pupdr.ui.FoodViewModel
+import dev.suks.pupdr.ui.screens.FoodScreen
 import dev.suks.pupdr.ui.Messages
 import dev.suks.pupdr.ui.ReportsViewModel
 import dev.suks.pupdr.ui.RoutineDetailViewModel
@@ -92,6 +96,7 @@ class MainActivity : ComponentActivity() {
 
 private enum class Tab(val route: String, val label: String, val icon: ImageVector, val selectedIcon: ImageVector) {
     Workout("workout", "Workout", Icons.Outlined.Today, Icons.Default.Today),
+    Food("food", "Food", Icons.Outlined.Restaurant, Icons.Default.Restaurant),
     Exercises("exercises", "Exercises", Icons.Outlined.FitnessCenter, Icons.Default.FitnessCenter),
     Routines("routines", "Routines", Icons.AutoMirrored.Outlined.List, Icons.AutoMirrored.Filled.List),
     Reports("reports", "Reports", Icons.Outlined.Insights, Icons.Default.Insights),
@@ -104,6 +109,7 @@ private fun PupdrRoot(app: PupdrApp) {
     val exercisesVm: ExercisesViewModel = viewModel { ExercisesViewModel(app, messages) }
     val routinesVm: RoutinesViewModel = viewModel { RoutinesViewModel(app, messages) }
     val reportsVm: ReportsViewModel = viewModel { ReportsViewModel(app) }
+    val foodVm: FoodViewModel = viewModel { FoodViewModel(app, messages) }
     val routines by routinesVm.routines.collectAsState()
 
     val nav = rememberNavController()
@@ -155,7 +161,13 @@ private fun PupdrRoot(app: PupdrApp) {
             popEnterTransition = { fadeIn(Motion.enter(Motion.MEDIUM, delay = 60)) + scaleIn(Motion.enter(Motion.MEDIUM, delay = 60), initialScale = 0.94f) },
             popExitTransition = { fadeOut(Motion.exit(90)) },
         ) {
-            composable(Tab.Workout.route) { WorkoutScreen(workoutVm, exercisesVm) }
+            composable(Tab.Workout.route) {
+                WorkoutScreen(workoutVm, exercisesVm, onOpenFood = {
+                    foodVm.setDay(workoutVm.day.value)
+                    goTab(Tab.Food.route)
+                })
+            }
+            composable(Tab.Food.route) { FoodScreen(foodVm) }
             composable(Tab.Exercises.route) {
                 ExercisesScreen(exercisesVm, routines) { id ->
                     workoutVm.addExercises(listOf(id))

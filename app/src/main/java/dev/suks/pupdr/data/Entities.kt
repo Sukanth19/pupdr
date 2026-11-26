@@ -1,5 +1,6 @@
 package dev.suks.pupdr.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -97,7 +98,7 @@ data class RoutineSummary(
 @Entity(tableName = "daily_logs", primaryKeys = ["epochDay", "key"])
 data class DailyLog(val epochDay: Long, val key: String, val value: Double)
 
-/** Something eaten, for the protein / calorie tally. */
+/** Something eaten. Macros are grams; [meal] is a [Meal] ordinal. */
 @Entity(tableName = "food_entries", indices = [Index("epochDay")])
 data class FoodEntry(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -106,4 +107,9 @@ data class FoodEntry(
     val protein: Double,
     val calories: Int,
     val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(defaultValue = "0") val carbs: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val fat: Double = 0.0,
+    @ColumnInfo(defaultValue = "3") val meal: Int = Meal.SNACK.ordinal,
 )
+
+enum class Meal(val label: String) { BREAKFAST("Breakfast"), LUNCH("Lunch"), DINNER("Dinner"), SNACK("Snacks") }
